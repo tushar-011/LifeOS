@@ -2,7 +2,10 @@ import customtkinter as ctk
 from datetime import datetime
 
 from ui.dashboard import DashboardPage
+from ui.tasks import TasksPage
 from ui.components import NavButton
+
+from database.database import initialize_database
 
 
 ctk.set_appearance_mode("dark")
@@ -13,6 +16,9 @@ class LifeOSApp(ctk.CTk):
 
     def __init__(self):
         super().__init__()
+
+        # Initialize database before loading UI
+        initialize_database()
 
         self.title("LifeOS")
         self.geometry("1400x820")
@@ -52,7 +58,7 @@ class LifeOSApp(ctk.CTk):
 
         self.topbar.grid_columnconfigure(2, weight=1)
 
-        # Menu
+        # Menu Button
         self.menu_button = ctk.CTkButton(
             self.topbar,
             text="☰",
@@ -69,7 +75,7 @@ class LifeOSApp(ctk.CTk):
             pady=10
         )
 
-        # App name
+        # App Name
         self.app_title = ctk.CTkLabel(
             self.topbar,
             text="LifeOS",
@@ -102,7 +108,7 @@ class LifeOSApp(ctk.CTk):
             padx=15
         )
 
-        # Theme toggle
+        # Theme Toggle
         self.theme_switch = ctk.CTkSwitch(
             self.topbar,
             text="Dark",
@@ -141,34 +147,65 @@ class LifeOSApp(ctk.CTk):
         self.nav_buttons = []
 
         navigation = [
-            ("Dashboard", "⌂", self.show_dashboard),
+            (
+                "Dashboard",
+                "⌂",
+                self.show_dashboard
+            ),
 
-            ("Tasks", "✓",
-             lambda: self.show_placeholder("Tasks")),
+            (
+                "Tasks",
+                "✓",
+                self.show_tasks
+            ),
 
-            ("Planner", "▦",
-             lambda: self.show_placeholder("Planner")),
+            (
+                "Planner",
+                "▦",
+                lambda: self.show_placeholder("Planner")
+            ),
 
-            ("Focus", "◎",
-             lambda: self.show_placeholder("Focus Mode")),
+            (
+                "Focus",
+                "◎",
+                lambda: self.show_placeholder("Focus Mode")
+            ),
 
-            ("Pomodoro", "◷",
-             lambda: self.show_placeholder("Pomodoro")),
+            (
+                "Pomodoro",
+                "◷",
+                lambda: self.show_placeholder("Pomodoro")
+            ),
 
-            ("Stopwatch", "◴",
-             lambda: self.show_placeholder("Stopwatch")),
+            (
+                "Stopwatch",
+                "◴",
+                lambda: self.show_placeholder("Stopwatch")
+            ),
 
-            ("Notes", "▤",
-             lambda: self.show_placeholder("Notes")),
+            (
+                "Notes",
+                "▤",
+                lambda: self.show_placeholder("Notes")
+            ),
 
-            ("Analytics", "▥",
-             lambda: self.show_placeholder("Analytics")),
+            (
+                "Analytics",
+                "▥",
+                lambda: self.show_placeholder("Analytics")
+            ),
 
-            ("History", "↺",
-             lambda: self.show_placeholder("History")),
+            (
+                "History",
+                "↺",
+                lambda: self.show_placeholder("History")
+            ),
 
-            ("Reports", "▧",
-             lambda: self.show_placeholder("Reports")),
+            (
+                "Reports",
+                "▧",
+                lambda: self.show_placeholder("Reports")
+            ),
         ]
 
         row = 0
@@ -194,7 +231,7 @@ class LifeOSApp(ctk.CTk):
 
             row += 1
 
-        # Push settings to bottom
+        # Push Settings to bottom
         self.sidebar.grid_rowconfigure(
             row,
             weight=1
@@ -263,6 +300,20 @@ class LifeOSApp(ctk.CTk):
         self.clear_content()
 
         page = DashboardPage(
+            self.content
+        )
+
+        page.grid(
+            row=0,
+            column=0,
+            sticky="nsew"
+        )
+
+    def show_tasks(self):
+
+        self.clear_content()
+
+        page = TasksPage(
             self.content
         )
 
@@ -351,6 +402,7 @@ class LifeOSApp(ctk.CTk):
         if self.theme_switch.get():
 
             ctk.set_appearance_mode("dark")
+
             self.theme_switch.configure(
                 text="Dark"
             )
@@ -358,6 +410,7 @@ class LifeOSApp(ctk.CTk):
         else:
 
             ctk.set_appearance_mode("light")
+
             self.theme_switch.configure(
                 text="Light"
             )

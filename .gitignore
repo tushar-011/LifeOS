@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual Environment
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Database temporary files
+*.db-journal
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Exported user files
+exports/*
+!exports/.gitkeep

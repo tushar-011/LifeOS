@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from datetime import datetime
 
-
+from ui.components import AppCard
 class DashboardPage(ctk.CTkScrollableFrame):
 
     def __init__(self, parent):
@@ -149,9 +149,9 @@ class DashboardPage(ctk.CTkScrollableFrame):
     def create_main_section(self):
 
         # Today's Tasks
-        tasks_card = ctk.CTkFrame(
+        tasks_card = AppCard(
             self,
-            corner_radius=15
+            title="Today's Tasks"
         )
 
         tasks_card.grid(

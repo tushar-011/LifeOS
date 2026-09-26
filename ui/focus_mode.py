@@ -6,13 +6,19 @@ from database.database import (
     get_today_tasks,
     add_focus_session,
     get_today_focus_stats,
-    get_recent_focus_sessions
+    get_recent_focus_sessions,
+)
+
+from ui.theme import (
+    COLORS,
+    FONT_BODY,
+    FONT_DISPLAY,
+    module_accent,
+    module_accent_hover,
 )
 
 
-class FocusModePage(
-    ctk.CTkScrollableFrame
-):
+class FocusModePage(ctk.CTkScrollableFrame):
 
     def __init__(
         self,
@@ -21,7 +27,8 @@ class FocusModePage(
 
         super().__init__(
             parent,
-            corner_radius=0
+            corner_radius=0,
+            fg_color=COLORS["app_bg"]
         )
 
         self.grid_columnconfigure(
@@ -29,9 +36,25 @@ class FocusModePage(
             weight=1
         )
 
-        # ---------------------------------------------
+        # =================================================
+        # VISUALS
+        # =================================================
+
+        self.accent = (
+            module_accent(
+                "Focus"
+            )
+        )
+
+        self.accent_hover = (
+            module_accent_hover(
+                "Focus"
+            )
+        )
+
+        # =================================================
         # TIMER STATE
-        # ---------------------------------------------
+        # =================================================
 
         self.running = False
         self.paused = False
@@ -44,13 +67,22 @@ class FocusModePage(
             * 60
         )
 
-        # Selected focus item
         self.task_lookup = {}
 
+        # Lock the active task while focusing.
+        self.active_task_id = None
+        self.active_task_title = None
+
+        # Responsive state
+        self._stacked_layout = False
+
+        # =================================================
+        # BUILD
+        # =================================================
+
         self.create_header()
-        self.create_focus_card()
-        self.create_statistics()
-        self.create_history()
+
+        self.create_main_layout()
 
         self.load_tasks()
         self.load_statistics()
@@ -58,88 +90,380 @@ class FocusModePage(
 
         self.update_timer_display()
 
+        self.after(
+            100,
+            self.apply_responsive_layout
+        )
+
     # =================================================
     # HEADER
     # =================================================
 
-    def create_header(self):
+    def create_header(
+        self
+    ):
 
-        header = ctk.CTkFrame(
-            self,
-            fg_color="transparent"
+        header = (
+            ctk.CTkFrame(
+                self,
+                fg_color="transparent"
+            )
         )
 
         header.grid(
             row=0,
             column=0,
             sticky="ew",
-            padx=25,
-            pady=(25, 10)
+            padx=28,
+            pady=(26, 16)
+        )
+
+        header.grid_columnconfigure(
+            0,
+            weight=1
+        )
+
+        left = (
+            ctk.CTkFrame(
+                header,
+                fg_color="transparent"
+            )
+        )
+
+        left.grid(
+            row=0,
+            column=0,
+            sticky="w"
         )
 
         ctk.CTkLabel(
-            header,
+            left,
             text="Focus Mode",
             font=ctk.CTkFont(
-                size=30,
+                family=FONT_DISPLAY,
+                size=31,
                 weight="bold"
-            )
+            ),
+            text_color=self.accent
         ).pack(
             anchor="w"
         )
 
         ctk.CTkLabel(
-            header,
+            left,
             text=(
-                "Choose one thing and give "
-                "it your full attention."
-            )
+                "Choose one thing and give it "
+                "your full attention."
+            ),
+            font=ctk.CTkFont(
+                family=FONT_BODY,
+                size=13
+            ),
+            text_color=COLORS["muted"]
         ).pack(
             anchor="w",
             pady=(5, 0)
         )
 
-    # =================================================
-    # FOCUS CARD
-    # =================================================
+        # ---------------------------------------------
+        # STATUS PILL
+        # ---------------------------------------------
 
-    def create_focus_card(self):
-
-        card = ctk.CTkFrame(
-            self,
-            corner_radius=15
+        self.header_status = (
+            ctk.CTkFrame(
+                header,
+                corner_radius=100,
+                fg_color=COLORS["surface_soft"]
+            )
         )
 
-        card.grid(
+        self.header_status.grid(
+            row=0,
+            column=1,
+            sticky="e",
+            padx=(15, 0)
+        )
+
+        self.header_status_dot = (
+            ctk.CTkFrame(
+                self.header_status,
+                width=8,
+                height=8,
+                corner_radius=100,
+                fg_color=COLORS["muted"]
+            )
+        )
+
+        self.header_status_dot.pack(
+            side="left",
+            padx=(11, 6),
+            pady=9
+        )
+
+        self.header_status_label = (
+            ctk.CTkLabel(
+                self.header_status,
+                text="Ready",
+                font=ctk.CTkFont(
+                    family=FONT_BODY,
+                    size=10,
+                    weight="bold"
+                ),
+                text_color=COLORS["text"]
+            )
+        )
+
+        self.header_status_label.pack(
+            side="left",
+            padx=(0, 11),
+            pady=6
+        )
+
+    # =================================================
+    # MAIN LAYOUT
+    # =================================================
+
+    def create_main_layout(
+        self
+    ):
+
+        self.main_container = (
+            ctk.CTkFrame(
+                self,
+                fg_color="transparent"
+            )
+        )
+
+        self.main_container.grid(
             row=1,
             column=0,
             sticky="ew",
-            padx=25,
-            pady=10
+            padx=28,
+            pady=(0, 28)
+        )
+
+        self.main_container.grid_columnconfigure(
+            0,
+            weight=6
+        )
+
+        self.main_container.grid_columnconfigure(
+            1,
+            weight=4
+        )
+
+        self.create_focus_panel()
+
+        self.create_side_panel()
+
+    # =================================================
+    # RESPONSIVE LAYOUT
+    # =================================================
+
+    def apply_responsive_layout(
+        self,
+        window_width=None
+    ):
+
+        if window_width is None:
+
+            try:
+
+                window_width = (
+                    self.winfo_toplevel()
+                    .winfo_width()
+                )
+
+            except Exception:
+
+                window_width = 1400
+
+        should_stack = (
+            window_width < 1160
+        )
+
+        if (
+            should_stack
+            == self._stacked_layout
+        ):
+
+            return
+
+        self._stacked_layout = (
+            should_stack
         )
 
         # ---------------------------------------------
-        # FOCUS ITEM
+        # STACKED
+        # ---------------------------------------------
+
+        if should_stack:
+
+            self.main_container.grid_columnconfigure(
+                0,
+                weight=1
+            )
+
+            self.main_container.grid_columnconfigure(
+                1,
+                weight=0
+            )
+
+            self.focus_card.grid_configure(
+                row=0,
+                column=0,
+                columnspan=2,
+                sticky="ew",
+                padx=0,
+                pady=(0, 12)
+            )
+
+            self.side_container.grid_configure(
+                row=1,
+                column=0,
+                columnspan=2,
+                sticky="ew",
+                padx=0,
+                pady=0
+            )
+
+        # ---------------------------------------------
+        # DESKTOP
+        # ---------------------------------------------
+
+        else:
+
+            self.main_container.grid_columnconfigure(
+                0,
+                weight=6
+            )
+
+            self.main_container.grid_columnconfigure(
+                1,
+                weight=4
+            )
+
+            self.focus_card.grid_configure(
+                row=0,
+                column=0,
+                columnspan=1,
+                sticky="nsew",
+                padx=(0, 9),
+                pady=0
+            )
+
+            self.side_container.grid_configure(
+                row=0,
+                column=1,
+                columnspan=1,
+                sticky="nsew",
+                padx=(9, 0),
+                pady=0
+            )
+
+        self.after_idle(
+            self._refresh_scroll_region
+        )
+
+    # =================================================
+    # SCROLL REGION
+    # =================================================
+
+    def _refresh_scroll_region(
+        self
+    ):
+
+        try:
+
+            self.update_idletasks()
+
+            self._parent_canvas.configure(
+                scrollregion=(
+                    self._parent_canvas
+                    .bbox("all")
+                )
+            )
+
+        except Exception:
+
+            pass
+
+    # =================================================
+    # FOCUS PANEL
+    # =================================================
+
+    def create_focus_panel(
+        self
+    ):
+
+        self.focus_card = (
+            ctk.CTkFrame(
+                self.main_container,
+                corner_radius=20,
+                fg_color=COLORS["surface"],
+                border_width=1,
+                border_color=self.accent
+            )
+        )
+
+        self.focus_card.grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            padx=(0, 9)
+        )
+
+        self.focus_card.grid_columnconfigure(
+            0,
+            weight=1
+        )
+
+        # ---------------------------------------------
+        # TOP LABEL
         # ---------------------------------------------
 
         ctk.CTkLabel(
-            card,
+            self.focus_card,
+            text="DEEP FOCUS SESSION",
+            font=ctk.CTkFont(
+                family=FONT_BODY,
+                size=10,
+                weight="bold"
+            ),
+            text_color=self.accent
+        ).grid(
+            row=0,
+            column=0,
+            pady=(24, 5)
+        )
+
+        # ---------------------------------------------
+        # TASK LABEL
+        # ---------------------------------------------
+
+        ctk.CTkLabel(
+            self.focus_card,
             text="Focus On",
             font=ctk.CTkFont(
-                size=15,
+                family=FONT_BODY,
+                size=13,
                 weight="bold"
-            )
-        ).pack(
-            pady=(25, 5)
+            ),
+            text_color=COLORS["text"]
+        ).grid(
+            row=1,
+            column=0,
+            pady=(7, 6)
         )
 
         self.task_menu = (
             ctk.CTkOptionMenu(
-                card,
+                self.focus_card,
                 values=[
                     "General"
                 ],
-                width=340
+                width=360,
+                height=40
             )
         )
 
@@ -147,7 +471,9 @@ class FocusModePage(
             "General"
         )
 
-        self.task_menu.pack(
+        self.task_menu.grid(
+            row=2,
+            column=0,
             pady=5
         )
 
@@ -156,27 +482,32 @@ class FocusModePage(
         # ---------------------------------------------
 
         ctk.CTkLabel(
-            card,
+            self.focus_card,
             text="Duration",
             font=ctk.CTkFont(
-                size=15,
+                family=FONT_BODY,
+                size=13,
                 weight="bold"
-            )
-        ).pack(
-            pady=(15, 5)
+            ),
+            text_color=COLORS["text"]
+        ).grid(
+            row=3,
+            column=0,
+            pady=(15, 6)
         )
 
         self.duration_menu = (
             ctk.CTkOptionMenu(
-                card,
+                self.focus_card,
                 values=[
                     "15 minutes",
                     "25 minutes",
                     "45 minutes",
-                    "60 minutes"
+                    "60 minutes",
                 ],
                 command=self.change_duration,
-                width=180
+                width=180,
+                height=38
             )
         )
 
@@ -184,8 +515,37 @@ class FocusModePage(
             "25 minutes"
         )
 
-        self.duration_menu.pack(
+        self.duration_menu.grid(
+            row=4,
+            column=0,
             pady=5
+        )
+
+        # ---------------------------------------------
+        # TIMER SHELL
+        # ---------------------------------------------
+
+        timer_shell = (
+            ctk.CTkFrame(
+                self.focus_card,
+                corner_radius=24,
+                fg_color=COLORS["surface_alt"],
+                border_width=1,
+                border_color=COLORS["border_soft"]
+            )
+        )
+
+        timer_shell.grid(
+            row=5,
+            column=0,
+            padx=40,
+            pady=(25, 10),
+            sticky="ew"
+        )
+
+        timer_shell.grid_columnconfigure(
+            0,
+            weight=1
         )
 
         # ---------------------------------------------
@@ -194,49 +554,98 @@ class FocusModePage(
 
         self.timer_label = (
             ctk.CTkLabel(
-                card,
+                timer_shell,
                 text="25:00",
                 font=ctk.CTkFont(
-                    size=70,
+                    family=FONT_DISPLAY,
+                    size=72,
                     weight="bold"
-                )
+                ),
+                text_color=self.accent
             )
         )
 
-        self.timer_label.pack(
-            pady=(25, 10)
+        self.timer_label.grid(
+            row=0,
+            column=0,
+            pady=(25, 5)
+        )
+
+        # ---------------------------------------------
+        # PROGRESS
+        # ---------------------------------------------
+
+        self.progress_bar = (
+            ctk.CTkProgressBar(
+                timer_shell,
+                height=8,
+                corner_radius=100,
+                fg_color=COLORS["surface_soft"],
+                progress_color=self.accent
+            )
+        )
+
+        self.progress_bar.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=45,
+            pady=(5, 12)
+        )
+
+        self.progress_bar.set(
+            0
         )
 
         self.status_label = (
             ctk.CTkLabel(
-                card,
-                text="Ready to focus."
+                timer_shell,
+                text="Ready to focus.",
+                font=ctk.CTkFont(
+                    family=FONT_BODY,
+                    size=12
+                ),
+                text_color=COLORS["muted"]
             )
         )
 
-        self.status_label.pack(
-            pady=(0, 15)
+        self.status_label.grid(
+            row=2,
+            column=0,
+            pady=(0, 22)
         )
 
         # ---------------------------------------------
         # BUTTONS
         # ---------------------------------------------
 
-        button_frame = ctk.CTkFrame(
-            card,
-            fg_color="transparent"
+        button_frame = (
+            ctk.CTkFrame(
+                self.focus_card,
+                fg_color="transparent"
+            )
         )
 
-        button_frame.pack(
-            pady=(5, 30)
+        button_frame.grid(
+            row=6,
+            column=0,
+            pady=(10, 28)
         )
 
         self.start_button = (
             ctk.CTkButton(
                 button_frame,
                 text="Start Focus",
-                width=130,
-                height=42,
+                width=140,
+                height=43,
+                corner_radius=11,
+                fg_color=self.accent,
+                hover_color=self.accent_hover,
+                font=ctk.CTkFont(
+                    family=FONT_BODY,
+                    size=12,
+                    weight="bold"
+                ),
                 command=self.start_focus
             )
         )
@@ -250,8 +659,16 @@ class FocusModePage(
             ctk.CTkButton(
                 button_frame,
                 text="Pause",
-                width=100,
-                height=42,
+                width=105,
+                height=43,
+                corner_radius=11,
+                fg_color=COLORS["amber"],
+                hover_color=COLORS["amber_hover"],
+                font=ctk.CTkFont(
+                    family=FONT_BODY,
+                    size=12,
+                    weight="bold"
+                ),
                 command=self.pause_focus,
                 state="disabled"
             )
@@ -262,29 +679,72 @@ class FocusModePage(
             padx=5
         )
 
-        self.reset_button = (
+        self.stop_button = (
             ctk.CTkButton(
                 button_frame,
                 text="Stop Focus",
-                width=110,
-                height=42,
+                width=115,
+                height=43,
+                corner_radius=11,
+                fg_color=COLORS["danger"],
+                hover_color=COLORS["danger_hover"],
+                font=ctk.CTkFont(
+                    family=FONT_BODY,
+                    size=12,
+                    weight="bold"
+                ),
                 command=self.stop_focus_session
             )
         )
 
-        self.reset_button.pack(
+        self.stop_button.pack(
             side="left",
             padx=5
         )
 
     # =================================================
-    # TODAY'S TASKS + GENERAL
+    # SIDE PANEL
     # =================================================
 
-    def load_tasks(self):
+    def create_side_panel(
+        self
+    ):
 
-        tasks = get_today_tasks(
-            limit=100
+        self.side_container = (
+            ctk.CTkFrame(
+                self.main_container,
+                fg_color="transparent"
+            )
+        )
+
+        self.side_container.grid(
+            row=0,
+            column=1,
+            sticky="nsew",
+            padx=(9, 0)
+        )
+
+        self.side_container.grid_columnconfigure(
+            0,
+            weight=1
+        )
+
+        self.create_statistics()
+
+        self.create_history()
+
+    # =================================================
+    # TASKS
+    # =================================================
+
+    def load_tasks(
+        self
+    ):
+
+        tasks = (
+            get_today_tasks(
+                limit=100
+            )
         )
 
         current_selection = (
@@ -332,9 +792,9 @@ class FocusModePage(
             values=values
         )
 
-        # Don't overwrite selection while focusing
         if (
-            current_selection in values
+            current_selection
+            in values
         ):
 
             self.task_menu.set(
@@ -360,13 +820,14 @@ class FocusModePage(
             self.running
             or self.paused
         ):
+
             return
 
         durations = {
             "15 minutes": 15,
             "25 minutes": 25,
             "45 minutes": 45,
-            "60 minutes": 60
+            "60 minutes": 60,
         }
 
         self.duration_minutes = (
@@ -380,11 +841,17 @@ class FocusModePage(
 
         self.update_timer_display()
 
+        self.progress_bar.set(
+            0
+        )
+
     # =================================================
     # ACTIVE STATUS
     # =================================================
 
-    def is_session_active(self):
+    def is_session_active(
+        self
+    ):
 
         return (
             self.running
@@ -395,7 +862,9 @@ class FocusModePage(
     # START
     # =================================================
 
-    def start_focus(self):
+    def start_focus(
+        self
+    ):
 
         selected = (
             self.task_menu.get()
@@ -407,7 +876,9 @@ class FocusModePage(
         ):
 
             self.status_label.configure(
-                text="Select a focus item first."
+                text=(
+                    "Select a focus item first."
+                )
             )
 
             return
@@ -416,7 +887,30 @@ class FocusModePage(
             self.running
             or self.paused
         ):
+
             return
+
+        # ---------------------------------------------
+        # LOCK TASK FOR THIS SESSION
+        # ---------------------------------------------
+
+        selected_data = (
+            self.task_lookup[
+                selected
+            ]
+        )
+
+        self.active_task_id = (
+            selected_data[
+                "id"
+            ]
+        )
+
+        self.active_task_title = (
+            selected_data[
+                "title"
+            ]
+        )
 
         self.running = True
         self.paused = False
@@ -437,17 +931,16 @@ class FocusModePage(
             state="disabled"
         )
 
-        focus_title = (
-            self.task_lookup[
-                selected
-            ]["title"]
-        )
-
         self.status_label.configure(
             text=(
                 f"Focusing on: "
-                f"{focus_title}"
+                f"{self.active_task_title}"
             )
+        )
+
+        self.set_header_status(
+            "Focusing",
+            self.accent
         )
 
         self.tick()
@@ -456,9 +949,12 @@ class FocusModePage(
     # TIMER LOOP
     # =================================================
 
-    def tick(self):
+    def tick(
+        self
+    ):
 
         if not self.running:
+
             return
 
         self.update_timer_display()
@@ -474,18 +970,23 @@ class FocusModePage(
 
         self.remaining_seconds -= 1
 
-        self.after_id = self.after(
-            1000,
-            self.tick
+        self.after_id = (
+            self.after(
+                1000,
+                self.tick
+            )
         )
 
     # =================================================
     # PAUSE
     # =================================================
 
-    def pause_focus(self):
+    def pause_focus(
+        self
+    ):
 
         if not self.running:
+
             return
 
         self.running = False
@@ -500,6 +1001,7 @@ class FocusModePage(
                 )
 
             except Exception:
+
                 pass
 
             self.after_id = None
@@ -518,13 +1020,21 @@ class FocusModePage(
             text="Focus paused."
         )
 
+        self.set_header_status(
+            "Paused",
+            COLORS["amber"]
+        )
+
     # =================================================
     # RESUME
     # =================================================
 
-    def resume_focus(self):
+    def resume_focus(
+        self
+    ):
 
         if not self.paused:
+
             return
 
         self.running = True
@@ -540,23 +1050,16 @@ class FocusModePage(
             state="normal"
         )
 
-        selected = (
-            self.task_menu.get()
-        )
-
-        title = (
-            self.task_lookup.get(
-                selected,
-                {
-                    "title": "General"
-                }
-            )["title"]
-        )
-
         self.status_label.configure(
             text=(
-                f"Focusing on: {title}"
+                f"Focusing on: "
+                f"{self.active_task_title or 'General'}"
             )
+        )
+
+        self.set_header_status(
+            "Focusing",
+            self.accent
         )
 
         self.tick()
@@ -565,7 +1068,9 @@ class FocusModePage(
     # ELAPSED TIME
     # =================================================
 
-    def get_elapsed_seconds(self):
+    def get_elapsed_seconds(
+        self
+    ):
 
         planned_seconds = (
             self.duration_minutes
@@ -595,27 +1100,14 @@ class FocusModePage(
             self.get_elapsed_seconds()
         )
 
-        # Don't create empty sessions
         if elapsed_seconds <= 0:
+
             return False
 
-        selected = (
-            self.task_menu.get()
-        )
-
-        task_data = (
-            self.task_lookup.get(
-                selected,
-                {
-                    "id": None,
-                    "title": "General"
-                }
-            )
-        )
-
         add_focus_session(
-            task_data["id"],
-            task_data["title"],
+            self.active_task_id,
+            self.active_task_title
+            or "General",
             self.duration_minutes,
             actual_seconds=elapsed_seconds,
             status=status
@@ -624,7 +1116,7 @@ class FocusModePage(
         return True
 
     # =================================================
-    # MANUAL STOP
+    # STOP
     # =================================================
 
     def stop_focus_session(
@@ -671,31 +1163,21 @@ class FocusModePage(
             )
 
         self.load_statistics()
+
         self.load_history()
 
     # =================================================
     # COMPLETE
     # =================================================
 
-    def complete_focus(self):
-
-        selected = (
-            self.task_menu.get()
-        )
-
-        task_data = (
-            self.task_lookup.get(
-                selected,
-                {
-                    "id": None,
-                    "title": "General"
-                }
-            )
-        )
+    def complete_focus(
+        self
+    ):
 
         add_focus_session(
-            task_data["id"],
-            task_data["title"],
+            self.active_task_id,
+            self.active_task_title
+            or "General",
             self.duration_minutes,
             actual_seconds=(
                 self.duration_minutes
@@ -712,22 +1194,32 @@ class FocusModePage(
             )
         )
 
+        self.set_header_status(
+            "Completed",
+            COLORS["emerald"]
+        )
+
         try:
 
             self.bell()
 
         except Exception:
+
             pass
 
         self.load_statistics()
+
         self.load_history()
+
         self.load_tasks()
 
     # =================================================
     # RESET INTERNAL STATE
     # =================================================
 
-    def reset_focus_state(self):
+    def reset_focus_state(
+        self
+    ):
 
         if self.after_id:
 
@@ -738,6 +1230,7 @@ class FocusModePage(
                 )
 
             except Exception:
+
                 pass
 
             self.after_id = None
@@ -749,6 +1242,9 @@ class FocusModePage(
             self.duration_minutes
             * 60
         )
+
+        self.active_task_id = None
+        self.active_task_title = None
 
         self.start_button.configure(
             text="Start Focus",
@@ -768,13 +1264,20 @@ class FocusModePage(
             state="normal"
         )
 
+        self.set_header_status(
+            "Ready",
+            COLORS["muted"]
+        )
+
         self.update_timer_display()
 
     # =================================================
     # TIMER DISPLAY
     # =================================================
 
-    def update_timer_display(self):
+    def update_timer_display(
+        self
+    ):
 
         minutes = (
             self.remaining_seconds
@@ -793,54 +1296,109 @@ class FocusModePage(
             )
         )
 
+        planned_seconds = max(
+            1,
+            self.duration_minutes
+            * 60
+        )
+
+        elapsed = (
+            planned_seconds
+            - self.remaining_seconds
+        )
+
+        progress = min(
+            1,
+            max(
+                0,
+                elapsed
+                / planned_seconds
+            )
+        )
+
+        self.progress_bar.set(
+            progress
+        )
+
+    # =================================================
+    # HEADER STATUS
+    # =================================================
+
+    def set_header_status(
+        self,
+        text,
+        color
+    ):
+
+        self.header_status_label.configure(
+            text=text
+        )
+
+        self.header_status_dot.configure(
+            fg_color=color
+        )
+
     # =================================================
     # STATISTICS
     # =================================================
 
-    def create_statistics(self):
+    def create_statistics(
+        self
+    ):
 
-        frame = ctk.CTkFrame(
-            self,
-            fg_color="transparent"
+        self.statistics_frame = (
+            ctk.CTkFrame(
+                self.side_container,
+                fg_color="transparent"
+            )
         )
 
-        frame.grid(
-            row=2,
+        self.statistics_frame.grid(
+            row=0,
             column=0,
             sticky="ew",
-            padx=25,
-            pady=10
+            pady=(0, 12)
         )
 
-        frame.grid_columnconfigure(
+        self.statistics_frame.grid_columnconfigure(
             (0, 1),
             weight=1
         )
 
-        # Session count
-        session_card = ctk.CTkFrame(
-            frame,
-            corner_radius=15
+        # ---------------------------------------------
+        # SESSION CARD
+        # ---------------------------------------------
+
+        session_card = (
+            ctk.CTkFrame(
+                self.statistics_frame,
+                corner_radius=16,
+                fg_color=COLORS["surface"],
+                border_width=1,
+                border_color=COLORS["border"]
+            )
         )
 
         session_card.grid(
             row=0,
             column=0,
-            sticky="ew",
-            padx=(0, 7)
+            sticky="nsew",
+            padx=(0, 6)
         )
 
         ctk.CTkLabel(
             session_card,
-            text="Focus Sessions Today",
+            text="Sessions Today",
             font=ctk.CTkFont(
-                size=14,
+                family=FONT_BODY,
+                size=11,
                 weight="bold"
-            )
+            ),
+            text_color=COLORS["muted"]
         ).pack(
             anchor="w",
-            padx=18,
-            pady=(15, 3)
+            padx=15,
+            pady=(14, 4)
         )
 
         self.session_value = (
@@ -848,42 +1406,54 @@ class FocusModePage(
                 session_card,
                 text="0",
                 font=ctk.CTkFont(
-                    size=28,
+                    family=FONT_DISPLAY,
+                    size=27,
                     weight="bold"
-                )
+                ),
+                text_color=self.accent
             )
         )
 
         self.session_value.pack(
             anchor="w",
-            padx=18,
-            pady=(0, 15)
+            padx=15,
+            pady=(0, 14)
         )
 
-        # Focus time
-        time_card = ctk.CTkFrame(
-            frame,
-            corner_radius=15
+        # ---------------------------------------------
+        # TIME CARD
+        # ---------------------------------------------
+
+        time_card = (
+            ctk.CTkFrame(
+                self.statistics_frame,
+                corner_radius=16,
+                fg_color=COLORS["surface"],
+                border_width=1,
+                border_color=COLORS["border"]
+            )
         )
 
         time_card.grid(
             row=0,
             column=1,
-            sticky="ew",
-            padx=(7, 0)
+            sticky="nsew",
+            padx=(6, 0)
         )
 
         ctk.CTkLabel(
             time_card,
-            text="Tracked Focus Today",
+            text="Focused Today",
             font=ctk.CTkFont(
-                size=14,
+                family=FONT_BODY,
+                size=11,
                 weight="bold"
-            )
+            ),
+            text_color=COLORS["muted"]
         ).pack(
             anchor="w",
-            padx=18,
-            pady=(15, 3)
+            padx=15,
+            pady=(14, 4)
         )
 
         self.time_value = (
@@ -891,19 +1461,27 @@ class FocusModePage(
                 time_card,
                 text="0m",
                 font=ctk.CTkFont(
-                    size=28,
+                    family=FONT_DISPLAY,
+                    size=24,
                     weight="bold"
-                )
+                ),
+                text_color=COLORS["pink"]
             )
         )
 
         self.time_value.pack(
             anchor="w",
-            padx=18,
-            pady=(0, 15)
+            padx=15,
+            pady=(0, 14)
         )
 
-    def load_statistics(self):
+    # =================================================
+    # LOAD STATISTICS
+    # =================================================
+
+    def load_statistics(
+        self
+    ):
 
         stats = (
             get_today_focus_stats()
@@ -911,13 +1489,17 @@ class FocusModePage(
 
         self.session_value.configure(
             text=str(
-                stats["sessions"]
+                stats[
+                    "sessions"
+                ]
             )
         )
 
         self.time_value.configure(
             text=self.format_seconds(
-                stats["focus_seconds"]
+                stats[
+                    "focus_seconds"
+                ]
             )
         )
 
@@ -925,37 +1507,79 @@ class FocusModePage(
     # HISTORY
     # =================================================
 
-    def create_history(self):
+    def create_history(
+        self
+    ):
 
-        card = ctk.CTkFrame(
-            self,
-            corner_radius=15
+        self.history_card = (
+            ctk.CTkFrame(
+                self.side_container,
+                corner_radius=18,
+                fg_color=COLORS["surface"],
+                border_width=1,
+                border_color=COLORS["border"]
+            )
         )
 
-        card.grid(
-            row=3,
+        self.history_card.grid(
+            row=1,
             column=0,
-            sticky="ew",
-            padx=25,
-            pady=(10, 25)
+            sticky="nsew"
+        )
+
+        self.side_container.grid_rowconfigure(
+            1,
+            weight=1
+        )
+
+        # ---------------------------------------------
+        # HEADER
+        # ---------------------------------------------
+
+        header = (
+            ctk.CTkFrame(
+                self.history_card,
+                fg_color="transparent"
+            )
+        )
+
+        header.pack(
+            fill="x",
+            padx=18,
+            pady=(18, 10)
         )
 
         ctk.CTkLabel(
-            card,
+            header,
             text="Recent Focus Sessions",
             font=ctk.CTkFont(
-                size=20,
+                family=FONT_DISPLAY,
+                size=18,
                 weight="bold"
-            )
+            ),
+            text_color=COLORS["text"]
+        ).pack(
+            anchor="w"
+        )
+
+        ctk.CTkLabel(
+            header,
+            text=(
+                "Your latest tracked sessions"
+            ),
+            font=ctk.CTkFont(
+                family=FONT_BODY,
+                size=11
+            ),
+            text_color=COLORS["muted"]
         ).pack(
             anchor="w",
-            padx=20,
-            pady=(18, 10)
+            pady=(3, 0)
         )
 
         self.history_container = (
             ctk.CTkFrame(
-                card,
+                self.history_card,
                 fg_color="transparent"
             )
         )
@@ -963,11 +1587,17 @@ class FocusModePage(
         self.history_container.pack(
             fill="both",
             expand=True,
-            padx=15,
-            pady=(0, 15)
+            padx=14,
+            pady=(0, 14)
         )
 
-    def load_history(self):
+    # =================================================
+    # LOAD HISTORY
+    # =================================================
+
+    def load_history(
+        self
+    ):
 
         for widget in (
             self.history_container
@@ -982,13 +1612,57 @@ class FocusModePage(
 
         if not sessions:
 
-            ctk.CTkLabel(
-                self.history_container,
-                text=(
-                    "No Focus Mode sessions yet."
+            empty = (
+                ctk.CTkFrame(
+                    self.history_container,
+                    corner_radius=12,
+                    fg_color=COLORS["surface_alt"],
+                    border_width=1,
+                    border_color=COLORS["border_soft"]
                 )
+            )
+
+            empty.pack(
+                fill="x",
+                pady=5
+            )
+
+            ctk.CTkLabel(
+                empty,
+                text="◎",
+                font=ctk.CTkFont(
+                    size=24,
+                    weight="bold"
+                ),
+                text_color=self.accent
             ).pack(
-                pady=25
+                pady=(18, 4)
+            )
+
+            ctk.CTkLabel(
+                empty,
+                text="No Focus sessions yet",
+                font=ctk.CTkFont(
+                    family=FONT_BODY,
+                    size=12,
+                    weight="bold"
+                ),
+                text_color=COLORS["text"]
+            ).pack()
+
+            ctk.CTkLabel(
+                empty,
+                text=(
+                    "Your recent sessions "
+                    "will appear here."
+                ),
+                font=ctk.CTkFont(
+                    family=FONT_BODY,
+                    size=10
+                ),
+                text_color=COLORS["muted"]
+            ).pack(
+                pady=(3, 18)
             )
 
             return
@@ -1005,7 +1679,6 @@ class FocusModePage(
                 completed_at
             ) = session
 
-            # Compatibility with old sessions
             if not actual_seconds:
 
                 actual_seconds = (
@@ -1015,66 +1688,157 @@ class FocusModePage(
 
             try:
 
-                parsed = datetime.strptime(
-                    completed_at,
-                    "%Y-%m-%d %H:%M:%S"
+                parsed = (
+                    datetime.strptime(
+                        completed_at,
+                        "%Y-%m-%d %H:%M:%S"
+                    )
                 )
 
                 formatted = (
                     parsed.strftime(
-                        "%d %b %Y • "
-                        "%I:%M %p"
+                        "%d %b • %I:%M %p"
                     )
                 )
 
             except ValueError:
 
-                formatted = completed_at
+                formatted = (
+                    completed_at
+                )
 
-            row = ctk.CTkFrame(
-                self.history_container,
-                corner_radius=10
+            # -----------------------------------------
+            # ROW
+            # -----------------------------------------
+
+            row = (
+                ctk.CTkFrame(
+                    self.history_container,
+                    corner_radius=12,
+                    fg_color=COLORS["surface_alt"],
+                    border_width=1,
+                    border_color=COLORS["border_soft"]
+                )
             )
 
             row.pack(
                 fill="x",
-                pady=4
+                pady=5
             )
+
+            row.grid_columnconfigure(
+                0,
+                weight=1
+            )
+
+            # -----------------------------------------
+            # TITLE
+            # -----------------------------------------
 
             ctk.CTkLabel(
                 row,
                 text=task_title,
+                anchor="w",
+                justify="left",
                 font=ctk.CTkFont(
-                    size=14,
+                    family=FONT_BODY,
+                    size=12,
                     weight="bold"
+                ),
+                text_color=COLORS["text"]
+            ).grid(
+                row=0,
+                column=0,
+                sticky="ew",
+                padx=(13, 8),
+                pady=(11, 2)
+            )
+
+            # -----------------------------------------
+            # DETAILS
+            # -----------------------------------------
+
+            status_color = (
+                COLORS["emerald"]
+                if status
+                == "Completed"
+                else COLORS["amber"]
+            )
+
+            details_frame = (
+                ctk.CTkFrame(
+                    row,
+                    fg_color="transparent"
                 )
-            ).pack(
-                side="left",
-                padx=15,
-                pady=12
+            )
+
+            details_frame.grid(
+                row=1,
+                column=0,
+                sticky="w",
+                padx=13,
+                pady=(2, 11)
             )
 
             ctk.CTkLabel(
-                row,
-                text=(
-                    f"{self.format_seconds(actual_seconds)}"
-                    f" • {status}"
-                )
+                details_frame,
+                text=self.format_seconds(
+                    actual_seconds
+                ),
+                font=ctk.CTkFont(
+                    family=FONT_BODY,
+                    size=10
+                ),
+                text_color=COLORS["muted"]
             ).pack(
-                side="left",
-                padx=10
+                side="left"
             )
+
+            ctk.CTkLabel(
+                details_frame,
+                text=" • ",
+                text_color=COLORS["subtle"]
+            ).pack(
+                side="left"
+            )
+
+            ctk.CTkLabel(
+                details_frame,
+                text=status,
+                font=ctk.CTkFont(
+                    family=FONT_BODY,
+                    size=10,
+                    weight="bold"
+                ),
+                text_color=status_color
+            ).pack(
+                side="left"
+            )
+
+            # -----------------------------------------
+            # DATE
+            # -----------------------------------------
 
             ctk.CTkLabel(
                 row,
                 text=formatted,
                 font=ctk.CTkFont(
-                    size=11
-                )
-            ).pack(
-                side="right",
-                padx=15
+                    family=FONT_BODY,
+                    size=10
+                ),
+                text_color=COLORS["muted"]
+            ).grid(
+                row=0,
+                column=1,
+                rowspan=2,
+                sticky="e",
+                padx=(8, 13),
+                pady=10
             )
+
+        self.after_idle(
+            self._refresh_scroll_region
+        )
 
     # =================================================
     # HELPERS
@@ -1090,18 +1854,21 @@ class FocusModePage(
         )
 
         hours = (
-            seconds // 3600
+            seconds
+            // 3600
         )
 
         minutes = (
             (
-                seconds % 3600
+                seconds
+                % 3600
             )
             // 60
         )
 
         remaining_seconds = (
-            seconds % 60
+            seconds
+            % 60
         )
 
         if hours:

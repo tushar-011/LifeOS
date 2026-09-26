@@ -11,6 +11,7 @@ from ui.focus_mode import FocusModePage
 from ui.pomodoro import PomodoroPage
 from ui.stopwatch import StopwatchPage
 from ui.analytics import AnalyticsPage
+from ui.history import HistoryPage
 from ui.components import NavButton
 
 from database.database import (
@@ -19,11 +20,16 @@ from database.database import (
 
 
 # =================================================
-# CUSTOMTKINTER SETTINGS
+# CUSTOMTKINTER
 # =================================================
 
-ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("blue")
+ctk.set_appearance_mode(
+    "dark"
+)
+
+ctk.set_default_color_theme(
+    "blue"
+)
 
 
 # =================================================
@@ -46,7 +52,9 @@ class LifeOSApp(ctk.CTk):
         # WINDOW
         # ---------------------------------------------
 
-        self.title("LifeOS")
+        self.title(
+            "LifeOS"
+        )
 
         self.geometry(
             "1400x820"
@@ -58,7 +66,7 @@ class LifeOSApp(ctk.CTk):
         )
 
         # ---------------------------------------------
-        # SIDEBAR STATE
+        # SIDEBAR
         # ---------------------------------------------
 
         self.sidebar_open = True
@@ -89,7 +97,7 @@ class LifeOSApp(ctk.CTk):
         )
 
         # ---------------------------------------------
-        # UI
+        # INTERFACE
         # ---------------------------------------------
 
         self.create_topbar()
@@ -97,7 +105,7 @@ class LifeOSApp(ctk.CTk):
         self.create_content_area()
 
         # ---------------------------------------------
-        # GLOBAL TRACKPAD / MOUSE SCROLL
+        # GLOBAL SCROLLING
         # ---------------------------------------------
 
         self.bind_all(
@@ -106,7 +114,7 @@ class LifeOSApp(ctk.CTk):
         )
 
         # ---------------------------------------------
-        # WINDOW CLOSE
+        # CLOSE HANDLER
         # ---------------------------------------------
 
         self.protocol(
@@ -115,13 +123,13 @@ class LifeOSApp(ctk.CTk):
         )
 
         # ---------------------------------------------
-        # START PAGE
+        # START
         # ---------------------------------------------
 
         self.show_dashboard()
 
     # =================================================
-    # FOCUS MODE PROTECTION
+    # ACTIVE FOCUS CHECK
     # =================================================
 
     def focus_session_is_active(self):
@@ -148,7 +156,7 @@ class LifeOSApp(ctk.CTk):
             return False
 
     # =================================================
-    # ASK TO STOP FOCUS
+    # CONFIRM LEAVING FOCUS
     # =================================================
 
     def request_stop_focus(self):
@@ -167,7 +175,6 @@ class LifeOSApp(ctk.CTk):
             parent=self
         )
 
-        # User chose No
         if not answer:
 
             return False
@@ -187,7 +194,7 @@ class LifeOSApp(ctk.CTk):
         return True
 
     # =================================================
-    # HANDLE WINDOW CLOSE
+    # CLOSE APPLICATION
     # =================================================
 
     def handle_close(self):
@@ -296,7 +303,7 @@ class LifeOSApp(ctk.CTk):
         )
 
         # ---------------------------------------------
-        # MENU BUTTON
+        # SIDEBAR TOGGLE
         # ---------------------------------------------
 
         self.menu_button = (
@@ -318,7 +325,7 @@ class LifeOSApp(ctk.CTk):
         )
 
         # ---------------------------------------------
-        # TITLE
+        # APP TITLE
         # ---------------------------------------------
 
         self.app_title = (
@@ -366,7 +373,7 @@ class LifeOSApp(ctk.CTk):
         )
 
         # ---------------------------------------------
-        # THEME SWITCH
+        # THEME
         # ---------------------------------------------
 
         self.theme_switch = (
@@ -415,10 +422,6 @@ class LifeOSApp(ctk.CTk):
         )
 
         self.nav_buttons = []
-
-        # ---------------------------------------------
-        # NAVIGATION
-        # ---------------------------------------------
 
         navigation = [
 
@@ -473,10 +476,7 @@ class LifeOSApp(ctk.CTk):
             (
                 "History",
                 "↺",
-                lambda:
-                self.show_placeholder(
-                    "History"
-                )
+                self.show_history
             ),
 
             (
@@ -518,7 +518,10 @@ class LifeOSApp(ctk.CTk):
 
             row += 1
 
-        # Push settings to bottom
+        # ---------------------------------------------
+        # PUSH SETTINGS DOWN
+        # ---------------------------------------------
+
         self.sidebar.grid_rowconfigure(
             row,
             weight=1
@@ -583,7 +586,7 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # PAGE CACHE
+    # HIDE ALL PAGES
     # =================================================
 
     def hide_all_pages(self):
@@ -595,7 +598,7 @@ class LifeOSApp(ctk.CTk):
             page.grid_remove()
 
     # =================================================
-    # SHOW PAGE
+    # PAGE MANAGEMENT
     # =================================================
 
     def show_page(
@@ -620,14 +623,10 @@ class LifeOSApp(ctk.CTk):
 
                 return
 
-        # ---------------------------------------------
-        # HIDE CURRENT PAGE
-        # ---------------------------------------------
-
         self.hide_all_pages()
 
         # ---------------------------------------------
-        # CREATE PAGE ONLY ONCE
+        # CREATE ONCE
         # ---------------------------------------------
 
         if (
@@ -669,7 +668,7 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # REFRESH PAGE DATA
+    # REFRESH PAGE
     # =================================================
 
     def refresh_page(
@@ -680,20 +679,12 @@ class LifeOSApp(ctk.CTk):
 
         try:
 
-            # -----------------------------------------
-            # DASHBOARD
-            # -----------------------------------------
-
             if (
                 page_name
                 == "Dashboard"
             ):
 
                 page.refresh_dashboard()
-
-            # -----------------------------------------
-            # TASKS
-            # -----------------------------------------
 
             elif (
                 page_name
@@ -702,20 +693,12 @@ class LifeOSApp(ctk.CTk):
 
                 page.load_tasks()
 
-            # -----------------------------------------
-            # NOTES
-            # -----------------------------------------
-
             elif (
                 page_name
                 == "Notes"
             ):
 
                 page.load_notes()
-
-            # -----------------------------------------
-            # PLANNER
-            # -----------------------------------------
 
             elif (
                 page_name
@@ -725,10 +708,6 @@ class LifeOSApp(ctk.CTk):
                 page.build_calendar()
 
                 page.load_selected_day()
-
-            # -----------------------------------------
-            # FOCUS
-            # -----------------------------------------
 
             elif (
                 page_name
@@ -745,10 +724,6 @@ class LifeOSApp(ctk.CTk):
 
                 page.load_history()
 
-            # -----------------------------------------
-            # POMODORO
-            # -----------------------------------------
-
             elif (
                 page_name
                 == "Pomodoro"
@@ -757,10 +732,6 @@ class LifeOSApp(ctk.CTk):
                 page.load_statistics()
 
                 page.load_history()
-
-            # -----------------------------------------
-            # STOPWATCH
-            # -----------------------------------------
 
             elif (
                 page_name
@@ -771,16 +742,19 @@ class LifeOSApp(ctk.CTk):
 
                 page.load_history()
 
-            # -----------------------------------------
-            # ANALYTICS
-            # -----------------------------------------
-
             elif (
                 page_name
                 == "Analytics"
             ):
 
                 page.refresh_analytics()
+
+            elif (
+                page_name
+                == "History"
+            ):
+
+                page.refresh_history()
 
         except Exception:
 
@@ -875,7 +849,18 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # PLACEHOLDERS
+    # HISTORY
+    # =================================================
+
+    def show_history(self):
+
+        self.show_page(
+            "History",
+            HistoryPage
+        )
+
+    # =================================================
+    # PLACEHOLDER PAGE
     # =================================================
 
     def show_placeholder(
@@ -884,7 +869,7 @@ class LifeOSApp(ctk.CTk):
     ):
 
         # ---------------------------------------------
-        # BLOCK NAVIGATION DURING FOCUS MODE
+        # FOCUS MODE LOCK
         # ---------------------------------------------
 
         if (
@@ -902,10 +887,6 @@ class LifeOSApp(ctk.CTk):
         )
 
         self.hide_all_pages()
-
-        # ---------------------------------------------
-        # CREATE ONCE
-        # ---------------------------------------------
 
         if (
             page_name
@@ -970,7 +951,7 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # SIDEBAR TOGGLE
+    # COLLAPSE SIDEBAR
     # =================================================
 
     def toggle_sidebar(self):
@@ -1038,7 +1019,7 @@ class LifeOSApp(ctk.CTk):
 
 
 # =================================================
-# RUN APPLICATION
+# START APPLICATION
 # =================================================
 
 if __name__ == "__main__":

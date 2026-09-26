@@ -1,7 +1,7 @@
 import sqlite3
 
 from pathlib import Path
-from datetime import date
+from datetime import date, timedelta
 
 
 # =================================================
@@ -58,7 +58,8 @@ def initialize_database():
             priority TEXT DEFAULT 'Medium',
             category TEXT DEFAULT 'General',
             completed INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT
         )
         """
     )
@@ -94,7 +95,8 @@ def initialize_database():
             end_time TEXT,
             category TEXT DEFAULT 'General',
             completed INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT
         )
         """
     )
@@ -151,11 +153,12 @@ def initialize_database():
     )
 
     # =================================================
-    # DATABASE MIGRATION
+    # DATABASE MIGRATIONS
     # =================================================
-    # This upgrades an older focus_sessions table
-    # without deleting the user's existing database.
-    # =================================================
+
+    # -------------------------------------------------
+    # FOCUS MIGRATION
+    # -------------------------------------------------
 
     cursor.execute(
         """
@@ -164,8 +167,8 @@ def initialize_database():
     )
 
     focus_columns = [
-        column[1]
-        for column in cursor.fetchall()
+        row[1]
+        for row in cursor.fetchall()
     ]
 
     if (
@@ -191,6 +194,60 @@ def initialize_database():
             ALTER TABLE focus_sessions
             ADD COLUMN status
             TEXT DEFAULT 'Completed'
+            """
+        )
+
+    # -------------------------------------------------
+    # TASK HISTORY MIGRATION
+    # -------------------------------------------------
+
+    cursor.execute(
+        """
+        PRAGMA table_info(tasks)
+        """
+    )
+
+    task_columns = [
+        row[1]
+        for row in cursor.fetchall()
+    ]
+
+    if (
+        "completed_at"
+        not in task_columns
+    ):
+
+        cursor.execute(
+            """
+            ALTER TABLE tasks
+            ADD COLUMN completed_at TEXT
+            """
+        )
+
+    # -------------------------------------------------
+    # PLANNER HISTORY MIGRATION
+    # -------------------------------------------------
+
+    cursor.execute(
+        """
+        PRAGMA table_info(planner)
+        """
+    )
+
+    planner_columns = [
+        row[1]
+        for row in cursor.fetchall()
+    ]
+
+    if (
+        "completed_at"
+        not in planner_columns
+    ):
+
+        cursor.execute(
+            """
+            ALTER TABLE planner
+            ADD COLUMN completed_at TEXT
             """
         )
 
@@ -259,31 +316,19 @@ def get_tasks():
             completed ASC,
 
             CASE
-
                 WHEN due_date IS NULL
                 OR due_date = ''
-
                 THEN 1
-
                 ELSE 0
-
             END ASC,
 
             due_date ASC,
 
             CASE priority
-
-                WHEN 'High'
-                THEN 1
-
-                WHEN 'Medium'
-                THEN 2
-
-                WHEN 'Low'
-                THEN 3
-
+                WHEN 'High' THEN 1
+                WHEN 'Medium' THEN 2
+                WHEN 'Low' THEN 3
                 ELSE 4
-
             END ASC,
 
             id DESC
@@ -316,33 +361,20 @@ def get_pending_tasks():
         WHERE completed = 0
 
         ORDER BY
-
             CASE
-
                 WHEN due_date IS NULL
                 OR due_date = ''
-
                 THEN 1
-
                 ELSE 0
-
             END,
 
             due_date ASC,
 
             CASE priority
-
-                WHEN 'High'
-                THEN 1
-
-                WHEN 'Medium'
-                THEN 2
-
-                WHEN 'Low'
-                THEN 3
-
+                WHEN 'High' THEN 1
+                WHEN 'Medium' THEN 2
+                WHEN 'Low' THEN 3
                 ELSE 4
-
             END,
 
             id ASC
@@ -403,19 +435,39 @@ def toggle_task(
     connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute(
-        """
-        UPDATE tasks
+    if completed:
 
-        SET completed = ?
+        cursor.execute(
+            """
+            UPDATE tasks
 
-        WHERE id = ?
-        """,
-        (
-            completed,
-            task_id
+            SET
+                completed = 1,
+                completed_at = CURRENT_TIMESTAMP
+
+            WHERE id = ?
+            """,
+            (
+                task_id,
+            )
         )
-    )
+
+    else:
+
+        cursor.execute(
+            """
+            UPDATE tasks
+
+            SET
+                completed = 0,
+                completed_at = NULL
+
+            WHERE id = ?
+            """,
+            (
+                task_id,
+            )
+        )
 
     connection.commit()
     connection.close()
@@ -451,7 +503,6 @@ def get_task_statistics():
     cursor.execute(
         """
         SELECT COUNT(*)
-
         FROM tasks
         """
     )
@@ -461,9 +512,7 @@ def get_task_statistics():
     cursor.execute(
         """
         SELECT COUNT(*)
-
         FROM tasks
-
         WHERE completed = 1
         """
     )
@@ -510,20 +559,11 @@ def get_today_tasks(
             AND due_date = ?
 
         ORDER BY
-
             CASE priority
-
-                WHEN 'High'
-                THEN 1
-
-                WHEN 'Medium'
-                THEN 2
-
-                WHEN 'Low'
-                THEN 3
-
+                WHEN 'High' THEN 1
+                WHEN 'Medium' THEN 2
+                WHEN 'Low' THEN 3
                 ELSE 4
-
             END,
 
             id ASC
@@ -544,7 +584,7 @@ def get_today_tasks(
 
 
 # =================================================
-# NOTES
+# NOTE FUNCTIONS
 # =================================================
 
 def add_note(
@@ -715,7 +755,6 @@ def get_note_count():
     cursor.execute(
         """
         SELECT COUNT(*)
-
         FROM notes
         """
     )
@@ -728,7 +767,7 @@ def get_note_count():
 
 
 # =================================================
-# PLANNER
+# PLANNER FUNCTIONS
 # =================================================
 
 def add_planner_activity(
@@ -791,7 +830,12 @@ def get_planner_activities(
             WHERE activity_date = ?
 
             ORDER BY
-                completed ASC,
+                CASE
+                    WHEN start_time IS NULL
+                    OR start_time = ''
+                    THEN 1
+                    ELSE 0
+                END,
                 start_time ASC,
                 id ASC
             """,
@@ -817,6 +861,14 @@ def get_planner_activities(
 
             ORDER BY
                 activity_date ASC,
+
+                CASE
+                    WHEN start_time IS NULL
+                    OR start_time = ''
+                    THEN 1
+                    ELSE 0
+                END,
+
                 start_time ASC,
                 id ASC
             """
@@ -829,9 +881,13 @@ def get_planner_activities(
     return activities
 
 
-def toggle_planner_activity(
+def update_planner_activity(
     activity_id,
-    completed
+    title,
+    activity_date,
+    start_time,
+    end_time,
+    category
 ):
 
     connection = get_connection()
@@ -841,15 +897,70 @@ def toggle_planner_activity(
         """
         UPDATE planner
 
-        SET completed = ?
+        SET
+            title = ?,
+            activity_date = ?,
+            start_time = ?,
+            end_time = ?,
+            category = ?
 
         WHERE id = ?
         """,
         (
-            completed,
+            title,
+            activity_date,
+            start_time,
+            end_time,
+            category,
             activity_id
         )
     )
+
+    connection.commit()
+    connection.close()
+
+
+def toggle_planner_activity(
+    activity_id,
+    completed
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    if completed:
+
+        cursor.execute(
+            """
+            UPDATE planner
+
+            SET
+                completed = 1,
+                completed_at = CURRENT_TIMESTAMP
+
+            WHERE id = ?
+            """,
+            (
+                activity_id,
+            )
+        )
+
+    else:
+
+        cursor.execute(
+            """
+            UPDATE planner
+
+            SET
+                completed = 0,
+                completed_at = NULL
+
+            WHERE id = ?
+            """,
+            (
+                activity_id,
+            )
+        )
 
     connection.commit()
     connection.close()
@@ -905,7 +1016,13 @@ def get_today_planner(
         WHERE activity_date = ?
 
         ORDER BY
-            completed ASC,
+            CASE
+                WHEN start_time IS NULL
+                OR start_time = ''
+                THEN 1
+                ELSE 0
+            END,
+
             start_time ASC,
             id ASC
 
@@ -925,7 +1042,7 @@ def get_today_planner(
 
 
 # =================================================
-# POMODORO
+# POMODORO FUNCTIONS
 # =================================================
 
 def add_pomodoro_session(
@@ -978,10 +1095,7 @@ def get_today_pomodoro_stats():
 
         WHERE
             session_type = 'Focus'
-
-            AND DATE(
-                completed_at
-            ) = ?
+            AND DATE(completed_at) = ?
         """,
         (
             today,
@@ -1032,7 +1146,7 @@ def get_recent_pomodoro_sessions(
 
 
 # =================================================
-# STOPWATCH
+# STOPWATCH FUNCTIONS
 # =================================================
 
 def add_stopwatch_session(
@@ -1083,9 +1197,7 @@ def get_today_stopwatch_stats():
 
         FROM stopwatch_sessions
 
-        WHERE DATE(
-            completed_at
-        ) = ?
+        WHERE DATE(completed_at) = ?
         """,
         (
             today,
@@ -1136,7 +1248,7 @@ def get_recent_stopwatch_sessions(
 
 
 # =================================================
-# FOCUS MODE
+# FOCUS MODE FUNCTIONS
 # =================================================
 
 def add_focus_session(
@@ -1147,11 +1259,6 @@ def add_focus_session(
     status="Completed"
 ):
 
-    # -------------------------------------------------
-    # If an old caller does not provide actual time,
-    # assume the whole selected duration completed.
-    # -------------------------------------------------
-
     if actual_seconds is None:
 
         actual_seconds = (
@@ -1159,7 +1266,6 @@ def add_focus_session(
             * 60
         )
 
-    # Prevent negative values
     actual_seconds = max(
         0,
         int(actual_seconds)
@@ -1210,12 +1316,10 @@ def get_today_focus_stats():
             COALESCE(
                 SUM(
                     CASE
-
                         WHEN actual_seconds > 0
                         THEN actual_seconds
 
                         ELSE duration_minutes * 60
-
                     END
                 ),
                 0
@@ -1223,9 +1327,7 @@ def get_today_focus_stats():
 
         FROM focus_sessions
 
-        WHERE DATE(
-            completed_at
-        ) = ?
+        WHERE DATE(completed_at) = ?
         """,
         (
             today,
@@ -1253,15 +1355,10 @@ def get_today_focus_stats():
 
     return {
         "sessions": sessions,
-
-        "focus_seconds":
-            total_seconds,
-
-        "focus_minutes":
-            round(
-                total_seconds
-                / 60
-            )
+        "focus_seconds": total_seconds,
+        "focus_minutes": (
+            total_seconds / 60
+        )
     }
 
 
@@ -1300,6 +1397,7 @@ def get_recent_focus_sessions(
 
     return sessions
 
+
 # =================================================
 # PRODUCTIVITY / ANALYTICS
 # =================================================
@@ -1318,9 +1416,9 @@ def get_productivity_metrics(
     connection = get_connection()
     cursor = connection.cursor()
 
-    # =================================================
+    # -------------------------------------------------
     # TASKS
-    # =================================================
+    # -------------------------------------------------
 
     cursor.execute(
         """
@@ -1347,21 +1445,14 @@ def get_productivity_metrics(
         )
     )
 
-    task_result = (
-        cursor.fetchone()
-    )
+    result = cursor.fetchone()
 
-    tasks_total = (
-        task_result[0]
-    )
+    tasks_total = result[0]
+    tasks_completed = result[1]
 
-    tasks_completed = (
-        task_result[1]
-    )
-
-    # =================================================
+    # -------------------------------------------------
     # PLANNER
-    # =================================================
+    # -------------------------------------------------
 
     cursor.execute(
         """
@@ -1388,21 +1479,14 @@ def get_productivity_metrics(
         )
     )
 
-    planner_result = (
-        cursor.fetchone()
-    )
+    result = cursor.fetchone()
 
-    planner_total = (
-        planner_result[0]
-    )
+    planner_total = result[0]
+    planner_completed = result[1]
 
-    planner_completed = (
-        planner_result[1]
-    )
-
-    # =================================================
-    # POMODORO FOCUS TIME
-    # =================================================
+    # -------------------------------------------------
+    # POMODORO
+    # -------------------------------------------------
 
     cursor.execute(
         """
@@ -1427,9 +1511,9 @@ def get_productivity_metrics(
         cursor.fetchone()[0]
     )
 
-    # =================================================
-    # FOCUS MODE TIME
-    # =================================================
+    # -------------------------------------------------
+    # FOCUS MODE
+    # -------------------------------------------------
 
     cursor.execute(
         """
@@ -1437,12 +1521,10 @@ def get_productivity_metrics(
             COALESCE(
                 SUM(
                     CASE
-
                         WHEN actual_seconds > 0
                         THEN actual_seconds
 
                         ELSE duration_minutes * 60
-
                     END
                 ),
                 0
@@ -1462,8 +1544,7 @@ def get_productivity_metrics(
     )
 
     focus_mode_minutes = (
-        focus_seconds
-        / 60
+        focus_seconds / 60
     )
 
     total_focus_minutes = (
@@ -1471,9 +1552,9 @@ def get_productivity_metrics(
         + focus_mode_minutes
     )
 
-    # =================================================
+    # -------------------------------------------------
     # STOPWATCH
-    # =================================================
+    # -------------------------------------------------
 
     cursor.execute(
         """
@@ -1499,8 +1580,7 @@ def get_productivity_metrics(
     connection.close()
 
     return {
-        "date":
-            target_date,
+        "date": target_date,
 
         "tasks_total":
             tasks_total,
@@ -1532,13 +1612,10 @@ def get_weekly_productivity_metrics(
     days=7
 ):
 
-    from datetime import timedelta
-
     today = date.today()
 
     results = []
 
-    # Oldest day first
     for offset in reversed(
         range(days)
     ):
@@ -1561,3 +1638,349 @@ def get_weekly_productivity_metrics(
         )
 
     return results
+
+
+# =================================================
+# HISTORY COUNTS
+# =================================================
+
+def get_history_counts():
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    counts = {}
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM focus_sessions
+        """
+    )
+
+    counts["Focus"] = (
+        cursor.fetchone()[0]
+    )
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM pomodoro_sessions
+        """
+    )
+
+    counts["Pomodoro"] = (
+        cursor.fetchone()[0]
+    )
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM stopwatch_sessions
+        """
+    )
+
+    counts["Stopwatch"] = (
+        cursor.fetchone()[0]
+    )
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE completed = 1
+        """
+    )
+
+    counts["Tasks"] = (
+        cursor.fetchone()[0]
+    )
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM planner
+        WHERE completed = 1
+        """
+    )
+
+    counts["Planner"] = (
+        cursor.fetchone()[0]
+    )
+
+    counts["All"] = sum(
+        counts.values()
+    )
+
+    connection.close()
+
+    return counts
+
+
+# =================================================
+# HISTORY FILTER HELPER
+# =================================================
+
+def _history_date_condition(
+    period,
+    column_name
+):
+
+    if period == "Today":
+
+        return (
+            f"DATE({column_name}) "
+            f"= DATE('now', 'localtime')"
+        )
+
+    if period == "Last 7 Days":
+
+        return (
+            f"DATE({column_name}) >= "
+            f"DATE('now', 'localtime', '-6 days')"
+        )
+
+    if period == "Last 30 Days":
+
+        return (
+            f"DATE({column_name}) >= "
+            f"DATE('now', 'localtime', '-29 days')"
+        )
+
+    return "1 = 1"
+
+
+# =================================================
+# FOCUS HISTORY
+# =================================================
+
+def get_focus_history(
+    period="All Time"
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    condition = (
+        _history_date_condition(
+            period,
+            "completed_at"
+        )
+    )
+
+    cursor.execute(
+        f"""
+        SELECT
+            id,
+            task_title,
+            duration_minutes,
+            actual_seconds,
+            status,
+            completed_at
+
+        FROM focus_sessions
+
+        WHERE {condition}
+
+        ORDER BY
+            completed_at DESC,
+            id DESC
+        """
+    )
+
+    rows = cursor.fetchall()
+
+    connection.close()
+
+    return rows
+
+
+# =================================================
+# POMODORO HISTORY
+# =================================================
+
+def get_pomodoro_history(
+    period="All Time"
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    condition = (
+        _history_date_condition(
+            period,
+            "completed_at"
+        )
+    )
+
+    cursor.execute(
+        f"""
+        SELECT
+            id,
+            session_type,
+            duration_minutes,
+            completed_at
+
+        FROM pomodoro_sessions
+
+        WHERE {condition}
+
+        ORDER BY
+            completed_at DESC,
+            id DESC
+        """
+    )
+
+    rows = cursor.fetchall()
+
+    connection.close()
+
+    return rows
+
+
+# =================================================
+# STOPWATCH HISTORY
+# =================================================
+
+def get_stopwatch_history(
+    period="All Time"
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    condition = (
+        _history_date_condition(
+            period,
+            "completed_at"
+        )
+    )
+
+    cursor.execute(
+        f"""
+        SELECT
+            id,
+            duration_seconds,
+            lap_count,
+            completed_at
+
+        FROM stopwatch_sessions
+
+        WHERE {condition}
+
+        ORDER BY
+            completed_at DESC,
+            id DESC
+        """
+    )
+
+    rows = cursor.fetchall()
+
+    connection.close()
+
+    return rows
+
+
+# =================================================
+# TASK HISTORY
+# =================================================
+
+def get_task_history(
+    period="All Time"
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    condition = (
+        _history_date_condition(
+            period,
+            "COALESCE(completed_at, created_at)"
+        )
+    )
+
+    cursor.execute(
+        f"""
+        SELECT
+            id,
+            title,
+            due_date,
+            priority,
+            category,
+            completed_at,
+            created_at
+
+        FROM tasks
+
+        WHERE
+            completed = 1
+            AND {condition}
+
+        ORDER BY
+            COALESCE(
+                completed_at,
+                created_at
+            ) DESC,
+
+            id DESC
+        """
+    )
+
+    rows = cursor.fetchall()
+
+    connection.close()
+
+    return rows
+
+
+# =================================================
+# PLANNER HISTORY
+# =================================================
+
+def get_planner_history(
+    period="All Time"
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    condition = (
+        _history_date_condition(
+            period,
+            "COALESCE(completed_at, created_at)"
+        )
+    )
+
+    cursor.execute(
+        f"""
+        SELECT
+            id,
+            title,
+            activity_date,
+            start_time,
+            end_time,
+            category,
+            completed_at,
+            created_at
+
+        FROM planner
+
+        WHERE
+            completed = 1
+            AND {condition}
+
+        ORDER BY
+            COALESCE(
+                completed_at,
+                created_at
+            ) DESC,
+
+            id DESC
+        """
+    )
+
+    rows = cursor.fetchall()
+
+    connection.close()
+
+    return rows

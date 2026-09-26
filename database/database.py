@@ -1,35 +1,59 @@
 import sqlite3
+
 from pathlib import Path
 from datetime import date
 
 
-# -------------------------------------------------
+# =================================================
 # DATABASE PATH
-# -------------------------------------------------
+# =================================================
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-DB_PATH = DATA_DIR / "lifeos.db"
+BASE_DIR = (
+    Path(__file__)
+    .resolve()
+    .parent
+    .parent
+)
 
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = (
+    BASE_DIR
+    / "data"
+)
+
+DB_PATH = (
+    DATA_DIR
+    / "lifeos.db"
+)
+
+DATA_DIR.mkdir(
+    parents=True,
+    exist_ok=True
+)
 
 
-# -------------------------------------------------
+# =================================================
 # CONNECTION
-# -------------------------------------------------
+# =================================================
 
 def get_connection():
-    return sqlite3.connect(DB_PATH)
+
+    return sqlite3.connect(
+        DB_PATH
+    )
 
 
-# -------------------------------------------------
-# DATABASE INITIALIZATION
-# -------------------------------------------------
+# =================================================
+# INITIALIZE DATABASE
+# =================================================
 
 def initialize_database():
 
     connection = get_connection()
     cursor = connection.cursor()
+
+    # -------------------------------------------------
+    # TASKS
+    # -------------------------------------------------
 
     cursor.execute(
         """
@@ -46,6 +70,10 @@ def initialize_database():
         """
     )
 
+    # -------------------------------------------------
+    # NOTES
+    # -------------------------------------------------
+
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS notes (
@@ -58,7 +86,11 @@ def initialize_database():
         )
         """
     )
-    
+
+    # -------------------------------------------------
+    # PLANNER
+    # -------------------------------------------------
+
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS planner (
@@ -73,13 +105,29 @@ def initialize_database():
         )
         """
     )
+
+    # -------------------------------------------------
+    # POMODORO
+    # -------------------------------------------------
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_type TEXT NOT NULL,
+            duration_minutes INTEGER NOT NULL,
+            completed_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     connection.commit()
     connection.close()
 
 
-# -------------------------------------------------
-# ADD TASK
-# -------------------------------------------------
+# =================================================
+# TASK FUNCTIONS
+# =================================================
 
 def add_task(
     title,
@@ -116,10 +164,6 @@ def add_task(
     connection.close()
 
 
-# -------------------------------------------------
-# GET ALL TASKS
-# -------------------------------------------------
-
 def get_tasks():
 
     connection = get_connection()
@@ -135,10 +179,10 @@ def get_tasks():
             priority,
             category,
             completed
+
         FROM tasks
 
         ORDER BY
-
             completed ASC,
 
             CASE
@@ -167,10 +211,6 @@ def get_tasks():
 
     return tasks
 
-
-# -------------------------------------------------
-# UPDATE TASK
-# -------------------------------------------------
 
 def update_task(
     task_id,
@@ -211,10 +251,6 @@ def update_task(
     connection.close()
 
 
-# -------------------------------------------------
-# TASK COMPLETION STATUS
-# -------------------------------------------------
-
 def toggle_task(
     task_id,
     completed
@@ -239,11 +275,9 @@ def toggle_task(
     connection.close()
 
 
-# -------------------------------------------------
-# DELETE TASK
-# -------------------------------------------------
-
-def delete_task(task_id):
+def delete_task(
+    task_id
+):
 
     connection = get_connection()
     cursor = connection.cursor()
@@ -259,10 +293,6 @@ def delete_task(task_id):
     connection.commit()
     connection.close()
 
-
-# -------------------------------------------------
-# TASK STATISTICS
-# -------------------------------------------------
 
 def get_task_statistics():
 
@@ -299,13 +329,14 @@ def get_task_statistics():
     }
 
 
-# -------------------------------------------------
-# TODAY'S TASKS
-# -------------------------------------------------
+def get_today_tasks(
+    limit=5
+):
 
-def get_today_tasks(limit=5):
-
-    today = date.today().isoformat()
+    today = (
+        date.today()
+        .isoformat()
+    )
 
     connection = get_connection()
     cursor = connection.cursor()
@@ -327,7 +358,6 @@ def get_today_tasks(limit=5):
             AND due_date = ?
 
         ORDER BY
-
             CASE priority
                 WHEN 'High' THEN 1
                 WHEN 'Medium' THEN 2
@@ -351,10 +381,10 @@ def get_today_tasks(limit=5):
 
     return tasks
 
-# =================================================
-# NOTES
-# =================================================
 
+# =================================================
+# NOTE FUNCTIONS
+# =================================================
 
 def add_note(
     title,
@@ -401,7 +431,9 @@ def get_notes(
             category,
             created_at,
             updated_at
+
         FROM notes
+
         WHERE 1 = 1
     """
 
@@ -416,12 +448,16 @@ def get_notes(
             )
         """
 
-        search_pattern = f"%{search_text}%"
+        search_pattern = (
+            f"%{search_text}%"
+        )
 
-        parameters.extend([
-            search_pattern,
-            search_pattern
-        ])
+        parameters.extend(
+            [
+                search_pattern,
+                search_pattern
+            ]
+        )
 
     if category != "All Categories":
 
@@ -429,10 +465,14 @@ def get_notes(
             AND category = ?
         """
 
-        parameters.append(category)
+        parameters.append(
+            category
+        )
 
     query += """
-        ORDER BY updated_at DESC, id DESC
+        ORDER BY
+            updated_at DESC,
+            id DESC
     """
 
     cursor.execute(
@@ -481,7 +521,9 @@ def update_note(
     connection.close()
 
 
-def delete_note(note_id):
+def delete_note(
+    note_id
+):
 
     connection = get_connection()
     cursor = connection.cursor()
@@ -516,10 +558,10 @@ def get_note_count():
 
     return count
 
-# =================================================
-# PLANNER
-# =================================================
 
+# =================================================
+# PLANNER FUNCTIONS
+# =================================================
 
 def add_planner_activity(
     title,
@@ -556,7 +598,9 @@ def add_planner_activity(
     connection.close()
 
 
-def get_planner_activities(activity_date=None):
+def get_planner_activities(
+    activity_date=None
+):
 
     connection = get_connection()
     cursor = connection.cursor()
@@ -579,12 +623,7 @@ def get_planner_activities(activity_date=None):
             WHERE activity_date = ?
 
             ORDER BY
-                CASE
-                    WHEN start_time IS NULL
-                    OR start_time = ''
-                    THEN 1
-                    ELSE 0
-                END,
+                completed ASC,
                 start_time ASC,
                 id ASC
             """,
@@ -620,45 +659,6 @@ def get_planner_activities(activity_date=None):
     return activities
 
 
-def update_planner_activity(
-    activity_id,
-    title,
-    activity_date,
-    start_time,
-    end_time,
-    category
-):
-
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    cursor.execute(
-        """
-        UPDATE planner
-
-        SET
-            title = ?,
-            activity_date = ?,
-            start_time = ?,
-            end_time = ?,
-            category = ?
-
-        WHERE id = ?
-        """,
-        (
-            title,
-            activity_date,
-            start_time,
-            end_time,
-            category,
-            activity_id
-        )
-    )
-
-    connection.commit()
-    connection.close()
-
-
 def toggle_planner_activity(
     activity_id,
     completed
@@ -683,7 +683,9 @@ def toggle_planner_activity(
     connection.close()
 
 
-def delete_planner_activity(activity_id):
+def delete_planner_activity(
+    activity_id
+):
 
     connection = get_connection()
     cursor = connection.cursor()
@@ -700,9 +702,14 @@ def delete_planner_activity(activity_id):
     connection.close()
 
 
-def get_today_planner(limit=6):
+def get_today_planner(
+    limit=10
+):
 
-    today = date.today().isoformat()
+    today = (
+        date.today()
+        .isoformat()
+    )
 
     connection = get_connection()
     cursor = connection.cursor()
@@ -724,15 +731,8 @@ def get_today_planner(limit=6):
 
         ORDER BY
             completed ASC,
-
-            CASE
-                WHEN start_time IS NULL
-                OR start_time = ''
-                THEN 1
-                ELSE 0
-            END,
-
-            start_time ASC
+            start_time ASC,
+            id ASC
 
         LIMIT ?
         """,
@@ -747,3 +747,103 @@ def get_today_planner(limit=6):
     connection.close()
 
     return activities
+
+
+# =================================================
+# POMODORO FUNCTIONS
+# =================================================
+
+def add_pomodoro_session(
+    session_type,
+    duration_minutes
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO pomodoro_sessions (
+            session_type,
+            duration_minutes
+        )
+        VALUES (?, ?)
+        """,
+        (
+            session_type,
+            duration_minutes
+        )
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def get_today_pomodoro_stats():
+
+    today = (
+        date.today()
+        .isoformat()
+    )
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            COUNT(*),
+            COALESCE(
+                SUM(duration_minutes),
+                0
+            )
+
+        FROM pomodoro_sessions
+
+        WHERE
+            session_type = 'Focus'
+            AND DATE(completed_at) = ?
+        """,
+        (today,)
+    )
+
+    result = cursor.fetchone()
+
+    connection.close()
+
+    return {
+        "sessions": result[0],
+        "focus_minutes": result[1]
+    }
+
+
+def get_recent_pomodoro_sessions(
+    limit=10
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            session_type,
+            duration_minutes,
+            completed_at
+
+        FROM pomodoro_sessions
+
+        ORDER BY
+            id DESC
+
+        LIMIT ?
+        """,
+        (limit,)
+    )
+
+    sessions = cursor.fetchall()
+
+    connection.close()
+
+    return sessions

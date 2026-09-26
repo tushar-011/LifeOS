@@ -7,7 +7,8 @@ from database.database import (
     get_today_tasks,
     toggle_task,
     add_note,
-    get_today_planner
+    get_today_planner,
+    get_today_pomodoro_stats
 )
 
 
@@ -112,7 +113,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
                 2,
                 "Pomodoros",
                 "0",
-                "Sessions"
+                "Sessions Today"
             )
         )
 
@@ -198,10 +199,6 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
     def create_main_section(self):
 
-        # -------------------------------------------------
-        # TODAY'S TASKS
-        # -------------------------------------------------
-
         tasks_card = ctk.CTkFrame(
             self,
             corner_radius=15
@@ -242,10 +239,6 @@ class DashboardPage(ctk.CTkScrollableFrame):
             padx=15,
             pady=(0, 15)
         )
-
-        # -------------------------------------------------
-        # QUICK FOCUS
-        # -------------------------------------------------
 
         focus_card = ctk.CTkFrame(
             self,
@@ -291,8 +284,8 @@ class DashboardPage(ctk.CTkScrollableFrame):
             ctk.CTkLabel(
                 focus_card,
                 text=(
-                    "Select a task before "
-                    "starting focus."
+                    "Pomodoro and Focus Mode "
+                    "can be used from the sidebar."
                 )
             )
         )
@@ -301,26 +294,11 @@ class DashboardPage(ctk.CTkScrollableFrame):
             pady=5
         )
 
-        self.focus_button = ctk.CTkButton(
-            focus_card,
-            text="Start Focus",
-            width=150,
-            height=42
-        )
-
-        self.focus_button.pack(
-            pady=20
-        )
-
     # =================================================
     # SECONDARY
     # =================================================
 
     def create_secondary_section(self):
-
-        # -------------------------------------------------
-        # ANALYTICS
-        # -------------------------------------------------
 
         analytics_card = ctk.CTkFrame(
             self,
@@ -363,10 +341,6 @@ class DashboardPage(ctk.CTkScrollableFrame):
         ).pack(
             expand=True
         )
-
-        # -------------------------------------------------
-        # QUICK NOTE
-        # -------------------------------------------------
 
         notes_card = ctk.CTkFrame(
             self,
@@ -431,7 +405,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
         )
 
     # =================================================
-    # TODAY + PLAN
+    # TODAY
     # =================================================
 
     def create_today_section(self):
@@ -459,10 +433,6 @@ class DashboardPage(ctk.CTkScrollableFrame):
             1,
             weight=3
         )
-
-        # -------------------------------------------------
-        # DATE
-        # -------------------------------------------------
 
         date_frame = ctk.CTkFrame(
             card,
@@ -492,7 +462,9 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
         ctk.CTkLabel(
             date_frame,
-            text=now.strftime("%A"),
+            text=now.strftime(
+                "%A"
+            ),
             font=ctk.CTkFont(
                 size=25,
                 weight="bold"
@@ -511,13 +483,8 @@ class DashboardPage(ctk.CTkScrollableFrame):
                 size=15
             )
         ).pack(
-            anchor="w",
-            pady=(2, 0)
+            anchor="w"
         )
-
-        # -------------------------------------------------
-        # PLAN
-        # -------------------------------------------------
 
         plan_frame = ctk.CTkFrame(
             card,
@@ -563,11 +530,12 @@ class DashboardPage(ctk.CTkScrollableFrame):
     def refresh_dashboard(self):
 
         self.load_task_statistics()
+        self.load_pomodoro_statistics()
         self.load_dashboard_tasks()
         self.load_today_plan()
 
     # =================================================
-    # TASK STATISTICS
+    # STATS
     # =================================================
 
     def load_task_statistics(self):
@@ -581,8 +549,26 @@ class DashboardPage(ctk.CTkScrollableFrame):
             )
         )
 
+    def load_pomodoro_statistics(self):
+
+        stats = (
+            get_today_pomodoro_stats()
+        )
+
+        self.pomodoro_value.configure(
+            text=str(
+                stats["sessions"]
+            )
+        )
+
+        self.focus_value.configure(
+            text=self.format_minutes(
+                stats["focus_minutes"]
+            )
+        )
+
     # =================================================
-    # TODAY'S TASKS
+    # TASKS
     # =================================================
 
     def load_dashboard_tasks(self):
@@ -591,6 +577,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
             self.dashboard_tasks_container
             .winfo_children()
         ):
+
             widget.destroy()
 
         tasks = get_today_tasks()
@@ -659,10 +646,6 @@ class DashboardPage(ctk.CTkScrollableFrame):
                 padx=5
             )
 
-    # =================================================
-    # COMPLETE TASK
-    # =================================================
-
     def complete_dashboard_task(
         self,
         task_id
@@ -719,7 +702,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
         )
 
     # =================================================
-    # TODAY'S PLAN
+    # TODAY PLAN
     # =================================================
 
     def load_today_plan(self):
@@ -730,15 +713,20 @@ class DashboardPage(ctk.CTkScrollableFrame):
         ):
             widget.destroy()
 
-        activities = get_today_planner(
-            limit=10
+        activities = (
+            get_today_planner(
+                limit=10
+            )
         )
 
         if not activities:
 
             ctk.CTkLabel(
                 self.planner_container,
-                text="Nothing planned for today."
+                text=(
+                    "Nothing planned "
+                    "for today."
+                )
             ).pack(
                 anchor="w",
                 pady=10
@@ -768,7 +756,6 @@ class DashboardPage(ctk.CTkScrollableFrame):
                 pady=5
             )
 
-            # Time
             ctk.CTkLabel(
                 row,
                 text=self.format_time(
@@ -784,13 +771,11 @@ class DashboardPage(ctk.CTkScrollableFrame):
                 side="left"
             )
 
-            # Activity
-            activity_text = title
-
-            if completed:
-                activity_text = (
-                    f"✓ {title}"
-                )
+            activity_text = (
+                f"✓ {title}"
+                if completed
+                else title
+            )
 
             ctk.CTkLabel(
                 row,
@@ -804,7 +789,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
             )
 
     # =================================================
-    # TIME FORMAT
+    # HELPERS
     # =================================================
 
     def format_time(
@@ -830,5 +815,22 @@ class DashboardPage(ctk.CTkScrollableFrame):
             ValueError,
             TypeError
         ):
-
             return value
+
+    def format_minutes(
+        self,
+        minutes
+    ):
+
+        if minutes < 60:
+            return f"{minutes}m"
+
+        hours = minutes // 60
+        remaining = minutes % 60
+
+        if remaining == 0:
+            return f"{hours}h"
+
+        return (
+            f"{hours}h {remaining}m"
+        )

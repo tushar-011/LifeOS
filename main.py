@@ -6,20 +6,14 @@ from ui.dashboard import DashboardPage
 from ui.tasks import TasksPage
 from ui.notes import NotesPage
 from ui.planner import PlannerPage
+from ui.pomodoro import PomodoroPage
 from ui.components import NavButton
 
-from database.database import (
-    initialize_database
-)
+from database.database import initialize_database
 
 
-ctk.set_appearance_mode(
-    "dark"
-)
-
-ctk.set_default_color_theme(
-    "blue"
-)
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
 
 class LifeOSApp(ctk.CTk):
@@ -28,26 +22,22 @@ class LifeOSApp(ctk.CTk):
 
         super().__init__()
 
-        # Initialize SQLite tables
         initialize_database()
 
-        self.title(
-            "LifeOS"
-        )
-
-        self.geometry(
-            "1400x820"
-        )
-
-        self.minsize(
-            1050,
-            650
-        )
+        self.title("LifeOS")
+        self.geometry("1400x820")
+        self.minsize(1050, 650)
 
         self.sidebar_open = True
 
         self.sidebar_width = 220
         self.sidebar_collapsed_width = 72
+
+        # Stores already-created pages
+        self.pages = {}
+
+        # Stores current visible page name
+        self.current_page = None
 
         self.grid_rowconfigure(
             1,
@@ -63,7 +53,78 @@ class LifeOSApp(ctk.CTk):
         self.create_sidebar()
         self.create_content_area()
 
+        # Global mouse wheel / trackpad support
+        self.bind_all(
+            "<MouseWheel>",
+            self.handle_mousewheel
+        )
+
         self.show_dashboard()
+
+    # =================================================
+    # TRACKPAD / MOUSE WHEEL
+    # =================================================
+
+    def handle_mousewheel(
+        self,
+        event
+    ):
+
+        try:
+
+            widget = self.winfo_containing(
+                event.x_root,
+                event.y_root
+            )
+
+            current_widget = widget
+
+            while current_widget is not None:
+
+                if isinstance(
+                    current_widget,
+                    ctk.CTkScrollableFrame
+                ):
+
+                    canvas = (
+                        current_widget
+                        ._parent_canvas
+                    )
+
+                    if event.delta == 0:
+                        return
+
+                    direction = (
+                        -1
+                        if event.delta > 0
+                        else 1
+                    )
+
+                    magnitude = max(
+                        1,
+                        abs(event.delta) // 120
+                    )
+
+                    canvas.yview_scroll(
+                        direction * magnitude,
+                        "units"
+                    )
+
+                    return
+
+                try:
+
+                    current_widget = (
+                        current_widget.master
+                    )
+
+                except AttributeError:
+
+                    break
+
+        except Exception:
+
+            pass
 
     # =================================================
     # TOP BAR
@@ -89,16 +150,13 @@ class LifeOSApp(ctk.CTk):
             weight=1
         )
 
-        # Menu
-        self.menu_button = (
-            ctk.CTkButton(
-                self.topbar,
-                text="☰",
-                width=42,
-                height=38,
-                corner_radius=10,
-                command=self.toggle_sidebar
-            )
+        self.menu_button = ctk.CTkButton(
+            self.topbar,
+            text="☰",
+            width=42,
+            height=38,
+            corner_radius=10,
+            command=self.toggle_sidebar
         )
 
         self.menu_button.grid(
@@ -108,15 +166,12 @@ class LifeOSApp(ctk.CTk):
             pady=10
         )
 
-        # App title
-        self.app_title = (
-            ctk.CTkLabel(
-                self.topbar,
-                text="LifeOS",
-                font=ctk.CTkFont(
-                    size=24,
-                    weight="bold"
-                )
+        self.app_title = ctk.CTkLabel(
+            self.topbar,
+            text="LifeOS",
+            font=ctk.CTkFont(
+                size=24,
+                weight="bold"
             )
         )
 
@@ -126,21 +181,15 @@ class LifeOSApp(ctk.CTk):
             sticky="w"
         )
 
-        # Date
-        date_text = (
-            datetime.now()
-            .strftime(
-                "%A, %d %B"
-            )
+        date_text = datetime.now().strftime(
+            "%A, %d %B"
         )
 
-        self.date_label = (
-            ctk.CTkLabel(
-                self.topbar,
-                text=date_text,
-                font=ctk.CTkFont(
-                    size=14
-                )
+        self.date_label = ctk.CTkLabel(
+            self.topbar,
+            text=date_text,
+            font=ctk.CTkFont(
+                size=14
             )
         )
 
@@ -150,13 +199,10 @@ class LifeOSApp(ctk.CTk):
             padx=15
         )
 
-        # Theme
-        self.theme_switch = (
-            ctk.CTkSwitch(
-                self.topbar,
-                text="Dark",
-                command=self.toggle_theme
-            )
+        self.theme_switch = ctk.CTkSwitch(
+            self.topbar,
+            text="Dark",
+            command=self.toggle_theme
         )
 
         self.theme_switch.select()
@@ -173,12 +219,10 @@ class LifeOSApp(ctk.CTk):
 
     def create_sidebar(self):
 
-        self.sidebar = (
-            ctk.CTkFrame(
-                self,
-                width=self.sidebar_width,
-                corner_radius=0
-            )
+        self.sidebar = ctk.CTkFrame(
+            self,
+            width=self.sidebar_width,
+            corner_radius=0
         )
 
         self.sidebar.grid(
@@ -221,7 +265,8 @@ class LifeOSApp(ctk.CTk):
             (
                 "Focus",
                 "◎",
-                lambda: self.show_placeholder(
+                lambda:
+                self.show_placeholder(
                     "Focus Mode"
                 )
             ),
@@ -229,15 +274,14 @@ class LifeOSApp(ctk.CTk):
             (
                 "Pomodoro",
                 "◷",
-                lambda: self.show_placeholder(
-                    "Pomodoro"
-                )
+                self.show_pomodoro
             ),
 
             (
                 "Stopwatch",
                 "◴",
-                lambda: self.show_placeholder(
+                lambda:
+                self.show_placeholder(
                     "Stopwatch"
                 )
             ),
@@ -251,7 +295,8 @@ class LifeOSApp(ctk.CTk):
             (
                 "Analytics",
                 "▥",
-                lambda: self.show_placeholder(
+                lambda:
+                self.show_placeholder(
                     "Analytics"
                 )
             ),
@@ -259,7 +304,8 @@ class LifeOSApp(ctk.CTk):
             (
                 "History",
                 "↺",
-                lambda: self.show_placeholder(
+                lambda:
+                self.show_placeholder(
                     "History"
                 )
             ),
@@ -267,7 +313,8 @@ class LifeOSApp(ctk.CTk):
             (
                 "Reports",
                 "▧",
-                lambda: self.show_placeholder(
+                lambda:
+                self.show_placeholder(
                     "Reports"
                 )
             ),
@@ -307,15 +354,13 @@ class LifeOSApp(ctk.CTk):
             weight=1
         )
 
-        self.settings_button = (
-            NavButton(
-                self.sidebar,
-                text="Settings",
-                icon="⚙",
-                command=lambda:
-                self.show_placeholder(
-                    "Settings"
-                )
+        self.settings_button = NavButton(
+            self.sidebar,
+            text="Settings",
+            icon="⚙",
+            command=lambda:
+            self.show_placeholder(
+                "Settings"
             )
         )
 
@@ -337,12 +382,10 @@ class LifeOSApp(ctk.CTk):
 
     def create_content_area(self):
 
-        self.content = (
-            ctk.CTkFrame(
-                self,
-                corner_radius=0,
-                fg_color="transparent"
-            )
+        self.content = ctk.CTkFrame(
+            self,
+            corner_radius=0,
+            fg_color="transparent"
         )
 
         self.content.grid(
@@ -362,17 +405,93 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # CLEAR CONTENT
+    # PAGE MANAGEMENT
     # =================================================
 
-    def clear_content(self):
+    def hide_all_pages(self):
 
-        for widget in (
-            self.content
-            .winfo_children()
-        ):
+        for page in self.pages.values():
 
-            widget.destroy()
+            page.grid_remove()
+
+    def show_page(
+        self,
+        page_name,
+        page_class
+    ):
+
+        self.hide_all_pages()
+
+        # Create page only once
+        if page_name not in self.pages:
+
+            page = page_class(
+                self.content
+            )
+
+            page.grid(
+                row=0,
+                column=0,
+                sticky="nsew"
+            )
+
+            self.pages[
+                page_name
+            ] = page
+
+        else:
+
+            page = self.pages[
+                page_name
+            ]
+
+            page.grid()
+
+        self.current_page = page_name
+
+        # Refresh page data when needed
+        self.refresh_page(
+            page_name,
+            page
+        )
+
+    # =================================================
+    # REFRESH PAGE
+    # =================================================
+
+    def refresh_page(
+        self,
+        page_name,
+        page
+    ):
+
+        try:
+
+            if page_name == "Dashboard":
+
+                page.refresh_dashboard()
+
+            elif page_name == "Tasks":
+
+                page.load_tasks()
+
+            elif page_name == "Notes":
+
+                page.load_notes()
+
+            elif page_name == "Planner":
+
+                page.build_calendar()
+                page.load_selected_day()
+
+            elif page_name == "Pomodoro":
+
+                page.load_statistics()
+                page.load_history()
+
+        except Exception:
+
+            pass
 
     # =================================================
     # DASHBOARD
@@ -380,16 +499,9 @@ class LifeOSApp(ctk.CTk):
 
     def show_dashboard(self):
 
-        self.clear_content()
-
-        page = DashboardPage(
-            self.content
-        )
-
-        page.grid(
-            row=0,
-            column=0,
-            sticky="nsew"
+        self.show_page(
+            "Dashboard",
+            DashboardPage
         )
 
     # =================================================
@@ -398,16 +510,9 @@ class LifeOSApp(ctk.CTk):
 
     def show_tasks(self):
 
-        self.clear_content()
-
-        page = TasksPage(
-            self.content
-        )
-
-        page.grid(
-            row=0,
-            column=0,
-            sticky="nsew"
+        self.show_page(
+            "Tasks",
+            TasksPage
         )
 
     # =================================================
@@ -416,16 +521,9 @@ class LifeOSApp(ctk.CTk):
 
     def show_notes(self):
 
-        self.clear_content()
-
-        page = NotesPage(
-            self.content
-        )
-
-        page.grid(
-            row=0,
-            column=0,
-            sticky="nsew"
+        self.show_page(
+            "Notes",
+            NotesPage
         )
 
     # =================================================
@@ -434,16 +532,20 @@ class LifeOSApp(ctk.CTk):
 
     def show_planner(self):
 
-        self.clear_content()
-
-        page = PlannerPage(
-            self.content
+        self.show_page(
+            "Planner",
+            PlannerPage
         )
 
-        page.grid(
-            row=0,
-            column=0,
-            sticky="nsew"
+    # =================================================
+    # POMODORO
+    # =================================================
+
+    def show_pomodoro(self):
+
+        self.show_page(
+            "Pomodoro",
+            PomodoroPage
         )
 
     # =================================================
@@ -455,49 +557,72 @@ class LifeOSApp(ctk.CTk):
         title
     ):
 
-        self.clear_content()
-
-        page = ctk.CTkFrame(
-            self.content,
-            corner_radius=0,
-            fg_color="transparent"
+        page_name = (
+            f"placeholder_"
+            f"{title}"
         )
 
-        page.grid(
-            row=0,
-            column=0,
-            sticky="nsew"
-        )
+        self.hide_all_pages()
 
-        heading = ctk.CTkLabel(
-            page,
-            text=title,
-            font=ctk.CTkFont(
-                size=32,
-                weight="bold"
+        if page_name not in self.pages:
+
+            page = ctk.CTkFrame(
+                self.content,
+                corner_radius=0,
+                fg_color="transparent"
             )
-        )
 
-        heading.pack(
-            anchor="nw",
-            padx=35,
-            pady=(30, 10)
-        )
-
-        subtitle = ctk.CTkLabel(
-            page,
-            text=(
-                f"{title} module "
-                f"coming next."
-            ),
-            font=ctk.CTkFont(
-                size=15
+            page.grid(
+                row=0,
+                column=0,
+                sticky="nsew"
             )
-        )
 
-        subtitle.pack(
-            anchor="nw",
-            padx=35
+            heading = ctk.CTkLabel(
+                page,
+                text=title,
+                font=ctk.CTkFont(
+                    size=32,
+                    weight="bold"
+                )
+            )
+
+            heading.pack(
+                anchor="nw",
+                padx=35,
+                pady=(30, 10)
+            )
+
+            subtitle = ctk.CTkLabel(
+                page,
+                text=(
+                    f"{title} module "
+                    f"coming next."
+                ),
+                font=ctk.CTkFont(
+                    size=15
+                )
+            )
+
+            subtitle.pack(
+                anchor="nw",
+                padx=35
+            )
+
+            self.pages[
+                page_name
+            ] = page
+
+        else:
+
+            page = self.pages[
+                page_name
+            ]
+
+            page.grid()
+
+        self.current_page = (
+            page_name
         )
 
     # =================================================
@@ -527,8 +652,7 @@ class LifeOSApp(ctk.CTk):
 
             self.sidebar.configure(
                 width=(
-                    self
-                    .sidebar_width
+                    self.sidebar_width
                 )
             )
 

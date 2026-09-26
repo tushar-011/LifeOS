@@ -1,16 +1,33 @@
 import sqlite3
 from pathlib import Path
+from datetime import date
 
+
+# -------------------------------------------------
+# DATABASE PATH
+# -------------------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "data" / "lifeos.db"
+DATA_DIR = BASE_DIR / "data"
+DB_PATH = DATA_DIR / "lifeos.db"
 
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# -------------------------------------------------
+# CONNECTION
+# -------------------------------------------------
 
 def get_connection():
     return sqlite3.connect(DB_PATH)
 
 
+# -------------------------------------------------
+# DATABASE INITIALIZATION
+# -------------------------------------------------
+
 def initialize_database():
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -33,6 +50,10 @@ def initialize_database():
     connection.close()
 
 
+# -------------------------------------------------
+# ADD TASK
+# -------------------------------------------------
+
 def add_task(
     title,
     description="",
@@ -40,6 +61,7 @@ def add_task(
     priority="Medium",
     category="General"
 ):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -67,7 +89,12 @@ def add_task(
     connection.close()
 
 
+# -------------------------------------------------
+# GET ALL TASKS
+# -------------------------------------------------
+
 def get_tasks():
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -82,7 +109,28 @@ def get_tasks():
             category,
             completed
         FROM tasks
-        ORDER BY completed ASC, id DESC
+
+        ORDER BY
+
+            completed ASC,
+
+            CASE
+                WHEN due_date IS NULL
+                OR due_date = ''
+                THEN 1
+                ELSE 0
+            END ASC,
+
+            due_date ASC,
+
+            CASE priority
+                WHEN 'High' THEN 1
+                WHEN 'Medium' THEN 2
+                WHEN 'Low' THEN 3
+                ELSE 4
+            END ASC,
+
+            id DESC
         """
     )
 
@@ -93,6 +141,10 @@ def get_tasks():
     return tasks
 
 
+# -------------------------------------------------
+# UPDATE TASK
+# -------------------------------------------------
+
 def update_task(
     task_id,
     title,
@@ -101,18 +153,21 @@ def update_task(
     priority,
     category
 ):
+
     connection = get_connection()
     cursor = connection.cursor()
 
     cursor.execute(
         """
         UPDATE tasks
+
         SET
             title = ?,
             description = ?,
             due_date = ?,
             priority = ?,
             category = ?
+
         WHERE id = ?
         """,
         (
@@ -129,7 +184,15 @@ def update_task(
     connection.close()
 
 
-def toggle_task(task_id, completed):
+# -------------------------------------------------
+# TASK COMPLETION STATUS
+# -------------------------------------------------
+
+def toggle_task(
+    task_id,
+    completed
+):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -149,7 +212,12 @@ def toggle_task(task_id, completed):
     connection.close()
 
 
+# -------------------------------------------------
+# DELETE TASK
+# -------------------------------------------------
+
 def delete_task(task_id):
+
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -163,3 +231,95 @@ def delete_task(task_id):
 
     connection.commit()
     connection.close()
+
+
+# -------------------------------------------------
+# TASK STATISTICS
+# -------------------------------------------------
+
+def get_task_statistics():
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM tasks
+        """
+    )
+
+    total = cursor.fetchone()[0]
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE completed = 1
+        """
+    )
+
+    completed = cursor.fetchone()[0]
+
+    pending = total - completed
+
+    connection.close()
+
+    return {
+        "total": total,
+        "completed": completed,
+        "pending": pending
+    }
+
+
+# -------------------------------------------------
+# TODAY'S TASKS
+# -------------------------------------------------
+
+def get_today_tasks(limit=5):
+
+    today = date.today().isoformat()
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            title,
+            due_date,
+            priority,
+            category,
+            completed
+
+        FROM tasks
+
+        WHERE
+            completed = 0
+            AND due_date = ?
+
+        ORDER BY
+
+            CASE priority
+                WHEN 'High' THEN 1
+                WHEN 'Medium' THEN 2
+                WHEN 'Low' THEN 3
+                ELSE 4
+            END ASC,
+
+            id ASC
+
+        LIMIT ?
+        """,
+        (
+            today,
+            limit
+        )
+    )
+
+    tasks = cursor.fetchall()
+
+    connection.close()
+
+    return tasks

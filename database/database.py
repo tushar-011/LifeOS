@@ -1299,3 +1299,265 @@ def get_recent_focus_sessions(
     connection.close()
 
     return sessions
+
+# =================================================
+# PRODUCTIVITY / ANALYTICS
+# =================================================
+
+def get_productivity_metrics(
+    target_date=None
+):
+
+    if target_date is None:
+
+        target_date = (
+            date.today()
+            .isoformat()
+        )
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    # =================================================
+    # TASKS
+    # =================================================
+
+    cursor.execute(
+        """
+        SELECT
+            COUNT(*),
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN completed = 1
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            )
+
+        FROM tasks
+
+        WHERE due_date = ?
+        """,
+        (
+            target_date,
+        )
+    )
+
+    task_result = (
+        cursor.fetchone()
+    )
+
+    tasks_total = (
+        task_result[0]
+    )
+
+    tasks_completed = (
+        task_result[1]
+    )
+
+    # =================================================
+    # PLANNER
+    # =================================================
+
+    cursor.execute(
+        """
+        SELECT
+            COUNT(*),
+
+            COALESCE(
+                SUM(
+                    CASE
+                        WHEN completed = 1
+                        THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            )
+
+        FROM planner
+
+        WHERE activity_date = ?
+        """,
+        (
+            target_date,
+        )
+    )
+
+    planner_result = (
+        cursor.fetchone()
+    )
+
+    planner_total = (
+        planner_result[0]
+    )
+
+    planner_completed = (
+        planner_result[1]
+    )
+
+    # =================================================
+    # POMODORO FOCUS TIME
+    # =================================================
+
+    cursor.execute(
+        """
+        SELECT
+            COALESCE(
+                SUM(duration_minutes),
+                0
+            )
+
+        FROM pomodoro_sessions
+
+        WHERE
+            session_type = 'Focus'
+            AND DATE(completed_at) = ?
+        """,
+        (
+            target_date,
+        )
+    )
+
+    pomodoro_minutes = (
+        cursor.fetchone()[0]
+    )
+
+    # =================================================
+    # FOCUS MODE TIME
+    # =================================================
+
+    cursor.execute(
+        """
+        SELECT
+            COALESCE(
+                SUM(
+                    CASE
+
+                        WHEN actual_seconds > 0
+                        THEN actual_seconds
+
+                        ELSE duration_minutes * 60
+
+                    END
+                ),
+                0
+            )
+
+        FROM focus_sessions
+
+        WHERE DATE(completed_at) = ?
+        """,
+        (
+            target_date,
+        )
+    )
+
+    focus_seconds = (
+        cursor.fetchone()[0]
+    )
+
+    focus_mode_minutes = (
+        focus_seconds
+        / 60
+    )
+
+    total_focus_minutes = (
+        pomodoro_minutes
+        + focus_mode_minutes
+    )
+
+    # =================================================
+    # STOPWATCH
+    # =================================================
+
+    cursor.execute(
+        """
+        SELECT
+            COALESCE(
+                SUM(duration_seconds),
+                0
+            )
+
+        FROM stopwatch_sessions
+
+        WHERE DATE(completed_at) = ?
+        """,
+        (
+            target_date,
+        )
+    )
+
+    stopwatch_seconds = (
+        cursor.fetchone()[0]
+    )
+
+    connection.close()
+
+    return {
+        "date":
+            target_date,
+
+        "tasks_total":
+            tasks_total,
+
+        "tasks_completed":
+            tasks_completed,
+
+        "planner_total":
+            planner_total,
+
+        "planner_completed":
+            planner_completed,
+
+        "pomodoro_minutes":
+            pomodoro_minutes,
+
+        "focus_mode_minutes":
+            focus_mode_minutes,
+
+        "focus_minutes":
+            total_focus_minutes,
+
+        "stopwatch_seconds":
+            stopwatch_seconds
+    }
+
+
+def get_weekly_productivity_metrics(
+    days=7
+):
+
+    from datetime import timedelta
+
+    today = date.today()
+
+    results = []
+
+    # Oldest day first
+    for offset in reversed(
+        range(days)
+    ):
+
+        target = (
+            today
+            - timedelta(
+                days=offset
+            )
+        )
+
+        metrics = (
+            get_productivity_metrics(
+                target.isoformat()
+            )
+        )
+
+        results.append(
+            metrics
+        )
+
+    return results

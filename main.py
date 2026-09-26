@@ -10,6 +10,7 @@ from ui.planner import PlannerPage
 from ui.focus_mode import FocusModePage
 from ui.pomodoro import PomodoroPage
 from ui.stopwatch import StopwatchPage
+from ui.analytics import AnalyticsPage
 from ui.components import NavButton
 
 from database.database import (
@@ -17,14 +18,17 @@ from database.database import (
 )
 
 
-ctk.set_appearance_mode(
-    "dark"
-)
+# =================================================
+# CUSTOMTKINTER SETTINGS
+# =================================================
 
-ctk.set_default_color_theme(
-    "blue"
-)
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
+
+# =================================================
+# MAIN APPLICATION
+# =================================================
 
 class LifeOSApp(ctk.CTk):
 
@@ -32,11 +36,17 @@ class LifeOSApp(ctk.CTk):
 
         super().__init__()
 
+        # ---------------------------------------------
+        # DATABASE
+        # ---------------------------------------------
+
         initialize_database()
 
-        self.title(
-            "LifeOS"
-        )
+        # ---------------------------------------------
+        # WINDOW
+        # ---------------------------------------------
+
+        self.title("LifeOS")
 
         self.geometry(
             "1400x820"
@@ -47,13 +57,26 @@ class LifeOSApp(ctk.CTk):
             650
         )
 
+        # ---------------------------------------------
+        # SIDEBAR STATE
+        # ---------------------------------------------
+
         self.sidebar_open = True
 
         self.sidebar_width = 220
         self.sidebar_collapsed_width = 72
 
+        # ---------------------------------------------
+        # PAGE CACHE
+        # ---------------------------------------------
+
         self.pages = {}
+
         self.current_page = None
+
+        # ---------------------------------------------
+        # GRID
+        # ---------------------------------------------
 
         self.grid_rowconfigure(
             1,
@@ -65,42 +88,68 @@ class LifeOSApp(ctk.CTk):
             weight=1
         )
 
+        # ---------------------------------------------
+        # UI
+        # ---------------------------------------------
+
         self.create_topbar()
         self.create_sidebar()
         self.create_content_area()
 
-        # Trackpad / mouse wheel
+        # ---------------------------------------------
+        # GLOBAL TRACKPAD / MOUSE SCROLL
+        # ---------------------------------------------
+
         self.bind_all(
             "<MouseWheel>",
             self.handle_mousewheel
         )
 
-        # Handle app close
+        # ---------------------------------------------
+        # WINDOW CLOSE
+        # ---------------------------------------------
+
         self.protocol(
             "WM_DELETE_WINDOW",
             self.handle_close
         )
 
+        # ---------------------------------------------
+        # START PAGE
+        # ---------------------------------------------
+
         self.show_dashboard()
 
     # =================================================
-    # FOCUS PROTECTION
+    # FOCUS MODE PROTECTION
     # =================================================
 
     def focus_session_is_active(self):
 
-        focus_page = self.pages.get(
-            "Focus"
+        focus_page = (
+            self.pages.get(
+                "Focus"
+            )
         )
 
         if focus_page is None:
 
             return False
 
-        return (
-            focus_page
-            .is_session_active()
-        )
+        try:
+
+            return (
+                focus_page
+                .is_session_active()
+            )
+
+        except Exception:
+
+            return False
+
+    # =================================================
+    # ASK TO STOP FOCUS
+    # =================================================
 
     def request_stop_focus(self):
 
@@ -118,6 +167,7 @@ class LifeOSApp(ctk.CTk):
             parent=self
         )
 
+        # User chose No
         if not answer:
 
             return False
@@ -137,7 +187,7 @@ class LifeOSApp(ctk.CTk):
         return True
 
     # =================================================
-    # CLOSE APPLICATION
+    # HANDLE WINDOW CLOSE
     # =================================================
 
     def handle_close(self):
@@ -149,7 +199,7 @@ class LifeOSApp(ctk.CTk):
         self.destroy()
 
     # =================================================
-    # MOUSE / TRACKPAD
+    # TRACKPAD / MOUSE WHEEL
     # =================================================
 
     def handle_mousewheel(
@@ -168,7 +218,10 @@ class LifeOSApp(ctk.CTk):
 
             current_widget = widget
 
-            while current_widget is not None:
+            while (
+                current_widget
+                is not None
+            ):
 
                 if isinstance(
                     current_widget,
@@ -181,6 +234,7 @@ class LifeOSApp(ctk.CTk):
                     )
 
                     if event.delta == 0:
+
                         return
 
                     direction = (
@@ -218,7 +272,7 @@ class LifeOSApp(ctk.CTk):
             pass
 
     # =================================================
-    # TOPBAR
+    # TOP BAR
     # =================================================
 
     def create_topbar(self):
@@ -241,12 +295,19 @@ class LifeOSApp(ctk.CTk):
             weight=1
         )
 
-        self.menu_button = ctk.CTkButton(
-            self.topbar,
-            text="☰",
-            width=42,
-            height=38,
-            command=self.toggle_sidebar
+        # ---------------------------------------------
+        # MENU BUTTON
+        # ---------------------------------------------
+
+        self.menu_button = (
+            ctk.CTkButton(
+                self.topbar,
+                text="☰",
+                width=42,
+                height=38,
+                corner_radius=10,
+                command=self.toggle_sidebar
+            )
         )
 
         self.menu_button.grid(
@@ -256,12 +317,18 @@ class LifeOSApp(ctk.CTk):
             pady=10
         )
 
-        self.app_title = ctk.CTkLabel(
-            self.topbar,
-            text="LifeOS",
-            font=ctk.CTkFont(
-                size=24,
-                weight="bold"
+        # ---------------------------------------------
+        # TITLE
+        # ---------------------------------------------
+
+        self.app_title = (
+            ctk.CTkLabel(
+                self.topbar,
+                text="LifeOS",
+                font=ctk.CTkFont(
+                    size=24,
+                    weight="bold"
+                )
             )
         )
 
@@ -270,6 +337,10 @@ class LifeOSApp(ctk.CTk):
             column=1,
             sticky="w"
         )
+
+        # ---------------------------------------------
+        # DATE
+        # ---------------------------------------------
 
         date_text = (
             datetime.now()
@@ -281,7 +352,10 @@ class LifeOSApp(ctk.CTk):
         self.date_label = (
             ctk.CTkLabel(
                 self.topbar,
-                text=date_text
+                text=date_text,
+                font=ctk.CTkFont(
+                    size=14
+                )
             )
         )
 
@@ -290,6 +364,10 @@ class LifeOSApp(ctk.CTk):
             column=3,
             padx=15
         )
+
+        # ---------------------------------------------
+        # THEME SWITCH
+        # ---------------------------------------------
 
         self.theme_switch = (
             ctk.CTkSwitch(
@@ -313,10 +391,12 @@ class LifeOSApp(ctk.CTk):
 
     def create_sidebar(self):
 
-        self.sidebar = ctk.CTkFrame(
-            self,
-            width=self.sidebar_width,
-            corner_radius=0
+        self.sidebar = (
+            ctk.CTkFrame(
+                self,
+                width=self.sidebar_width,
+                corner_radius=0
+            )
         )
 
         self.sidebar.grid(
@@ -336,50 +416,60 @@ class LifeOSApp(ctk.CTk):
 
         self.nav_buttons = []
 
+        # ---------------------------------------------
+        # NAVIGATION
+        # ---------------------------------------------
+
         navigation = [
+
             (
                 "Dashboard",
                 "⌂",
                 self.show_dashboard
             ),
+
             (
                 "Tasks",
                 "✓",
                 self.show_tasks
             ),
+
             (
                 "Planner",
                 "▦",
                 self.show_planner
             ),
+
             (
                 "Focus",
                 "◎",
                 self.show_focus
             ),
+
             (
                 "Pomodoro",
                 "◷",
                 self.show_pomodoro
             ),
+
             (
                 "Stopwatch",
                 "◴",
                 self.show_stopwatch
             ),
+
             (
                 "Notes",
                 "▤",
                 self.show_notes
             ),
+
             (
                 "Analytics",
                 "▥",
-                lambda:
-                self.show_placeholder(
-                    "Analytics"
-                )
+                self.show_analytics
             ),
+
             (
                 "History",
                 "↺",
@@ -388,6 +478,7 @@ class LifeOSApp(ctk.CTk):
                     "History"
                 )
             ),
+
             (
                 "Reports",
                 "▧",
@@ -427,18 +518,25 @@ class LifeOSApp(ctk.CTk):
 
             row += 1
 
+        # Push settings to bottom
         self.sidebar.grid_rowconfigure(
             row,
             weight=1
         )
 
-        self.settings_button = NavButton(
-            self.sidebar,
-            text="Settings",
-            icon="⚙",
-            command=lambda:
-            self.show_placeholder(
-                "Settings"
+        # ---------------------------------------------
+        # SETTINGS
+        # ---------------------------------------------
+
+        self.settings_button = (
+            NavButton(
+                self.sidebar,
+                text="Settings",
+                icon="⚙",
+                command=lambda:
+                self.show_placeholder(
+                    "Settings"
+                )
             )
         )
 
@@ -455,15 +553,17 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # CONTENT
+    # CONTENT AREA
     # =================================================
 
     def create_content_area(self):
 
-        self.content = ctk.CTkFrame(
-            self,
-            corner_radius=0,
-            fg_color="transparent"
+        self.content = (
+            ctk.CTkFrame(
+                self,
+                corner_radius=0,
+                fg_color="transparent"
+            )
         )
 
         self.content.grid(
@@ -483,7 +583,7 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # PAGE MANAGEMENT
+    # PAGE CACHE
     # =================================================
 
     def hide_all_pages(self):
@@ -494,6 +594,10 @@ class LifeOSApp(ctk.CTk):
 
             page.grid_remove()
 
+    # =================================================
+    # SHOW PAGE
+    # =================================================
+
     def show_page(
         self,
         page_name,
@@ -501,12 +605,14 @@ class LifeOSApp(ctk.CTk):
     ):
 
         # ---------------------------------------------
-        # BLOCK NAVIGATION DURING FOCUS
+        # FOCUS MODE LOCK
         # ---------------------------------------------
 
         if (
-            self.current_page == "Focus"
-            and page_name != "Focus"
+            self.current_page
+            == "Focus"
+            and page_name
+            != "Focus"
             and self.focus_session_is_active()
         ):
 
@@ -514,7 +620,15 @@ class LifeOSApp(ctk.CTk):
 
                 return
 
+        # ---------------------------------------------
+        # HIDE CURRENT PAGE
+        # ---------------------------------------------
+
         self.hide_all_pages()
+
+        # ---------------------------------------------
+        # CREATE PAGE ONLY ONCE
+        # ---------------------------------------------
 
         if (
             page_name
@@ -555,7 +669,7 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # REFRESH
+    # REFRESH PAGE DATA
     # =================================================
 
     def refresh_page(
@@ -566,49 +680,114 @@ class LifeOSApp(ctk.CTk):
 
         try:
 
-            if page_name == "Dashboard":
+            # -----------------------------------------
+            # DASHBOARD
+            # -----------------------------------------
+
+            if (
+                page_name
+                == "Dashboard"
+            ):
 
                 page.refresh_dashboard()
 
-            elif page_name == "Tasks":
+            # -----------------------------------------
+            # TASKS
+            # -----------------------------------------
+
+            elif (
+                page_name
+                == "Tasks"
+            ):
 
                 page.load_tasks()
 
-            elif page_name == "Notes":
+            # -----------------------------------------
+            # NOTES
+            # -----------------------------------------
+
+            elif (
+                page_name
+                == "Notes"
+            ):
 
                 page.load_notes()
 
-            elif page_name == "Planner":
+            # -----------------------------------------
+            # PLANNER
+            # -----------------------------------------
+
+            elif (
+                page_name
+                == "Planner"
+            ):
 
                 page.build_calendar()
+
                 page.load_selected_day()
 
-            elif page_name == "Focus":
+            # -----------------------------------------
+            # FOCUS
+            # -----------------------------------------
 
-                # Don't disturb active timer
-                if not page.is_session_active():
+            elif (
+                page_name
+                == "Focus"
+            ):
+
+                if not (
+                    page.is_session_active()
+                ):
 
                     page.load_tasks()
 
                 page.load_statistics()
+
                 page.load_history()
 
-            elif page_name == "Pomodoro":
+            # -----------------------------------------
+            # POMODORO
+            # -----------------------------------------
+
+            elif (
+                page_name
+                == "Pomodoro"
+            ):
 
                 page.load_statistics()
+
                 page.load_history()
 
-            elif page_name == "Stopwatch":
+            # -----------------------------------------
+            # STOPWATCH
+            # -----------------------------------------
+
+            elif (
+                page_name
+                == "Stopwatch"
+            ):
 
                 page.load_statistics()
+
                 page.load_history()
+
+            # -----------------------------------------
+            # ANALYTICS
+            # -----------------------------------------
+
+            elif (
+                page_name
+                == "Analytics"
+            ):
+
+                page.refresh_analytics()
 
         except Exception:
 
             pass
 
     # =================================================
-    # PAGES
+    # DASHBOARD
     # =================================================
 
     def show_dashboard(self):
@@ -618,12 +797,20 @@ class LifeOSApp(ctk.CTk):
             DashboardPage
         )
 
+    # =================================================
+    # TASKS
+    # =================================================
+
     def show_tasks(self):
 
         self.show_page(
             "Tasks",
             TasksPage
         )
+
+    # =================================================
+    # PLANNER
+    # =================================================
 
     def show_planner(self):
 
@@ -632,12 +819,20 @@ class LifeOSApp(ctk.CTk):
             PlannerPage
         )
 
+    # =================================================
+    # FOCUS
+    # =================================================
+
     def show_focus(self):
 
         self.show_page(
             "Focus",
             FocusModePage
         )
+
+    # =================================================
+    # POMODORO
+    # =================================================
 
     def show_pomodoro(self):
 
@@ -646,12 +841,20 @@ class LifeOSApp(ctk.CTk):
             PomodoroPage
         )
 
+    # =================================================
+    # STOPWATCH
+    # =================================================
+
     def show_stopwatch(self):
 
         self.show_page(
             "Stopwatch",
             StopwatchPage
         )
+
+    # =================================================
+    # NOTES
+    # =================================================
 
     def show_notes(self):
 
@@ -661,7 +864,18 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # PLACEHOLDER
+    # ANALYTICS
+    # =================================================
+
+    def show_analytics(self):
+
+        self.show_page(
+            "Analytics",
+            AnalyticsPage
+        )
+
+    # =================================================
+    # PLACEHOLDERS
     # =================================================
 
     def show_placeholder(
@@ -669,9 +883,13 @@ class LifeOSApp(ctk.CTk):
         title
     ):
 
-        # Prevent leaving active Focus Mode
+        # ---------------------------------------------
+        # BLOCK NAVIGATION DURING FOCUS MODE
+        # ---------------------------------------------
+
         if (
-            self.current_page == "Focus"
+            self.current_page
+            == "Focus"
             and self.focus_session_is_active()
         ):
 
@@ -685,7 +903,14 @@ class LifeOSApp(ctk.CTk):
 
         self.hide_all_pages()
 
-        if page_name not in self.pages:
+        # ---------------------------------------------
+        # CREATE ONCE
+        # ---------------------------------------------
+
+        if (
+            page_name
+            not in self.pages
+        ):
 
             page = ctk.CTkFrame(
                 self.content,
@@ -717,6 +942,9 @@ class LifeOSApp(ctk.CTk):
                 text=(
                     f"{title} module "
                     f"coming next."
+                ),
+                font=ctk.CTkFont(
+                    size=15
                 )
             ).pack(
                 anchor="nw",
@@ -742,7 +970,7 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # SIDEBAR
+    # SIDEBAR TOGGLE
     # =================================================
 
     def toggle_sidebar(self):
@@ -767,7 +995,9 @@ class LifeOSApp(ctk.CTk):
         else:
 
             self.sidebar.configure(
-                width=self.sidebar_width
+                width=(
+                    self.sidebar_width
+                )
             )
 
             for button in (
@@ -784,7 +1014,9 @@ class LifeOSApp(ctk.CTk):
 
     def toggle_theme(self):
 
-        if self.theme_switch.get():
+        if (
+            self.theme_switch.get()
+        ):
 
             ctk.set_appearance_mode(
                 "dark"
@@ -804,6 +1036,10 @@ class LifeOSApp(ctk.CTk):
                 text="Light"
             )
 
+
+# =================================================
+# RUN APPLICATION
+# =================================================
 
 if __name__ == "__main__":
 

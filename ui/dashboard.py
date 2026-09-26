@@ -1,6 +1,13 @@
 import customtkinter as ctk
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from datetime import datetime
+
+from matplotlib.backends.backend_tkagg import (
+    FigureCanvasTkAgg
+)
 
 from database.database import (
     get_task_statistics,
@@ -9,9 +16,19 @@ from database.database import (
     add_note,
     get_today_planner,
     get_today_pomodoro_stats,
-    get_today_focus_stats
+    get_today_focus_stats,
+    get_productivity_metrics,
+    get_weekly_productivity_metrics
 )
 
+from utils.productivity import (
+    calculate_productivity_score
+)
+
+
+# =================================================
+# DASHBOARD
+# =================================================
 
 class DashboardPage(
     ctk.CTkScrollableFrame
@@ -32,12 +49,20 @@ class DashboardPage(
             weight=1
         )
 
+        # Quick Focus task mapping
         self.quick_focus_lookup = {}
 
+        # Weekly chart reference
+        self.weekly_chart_canvas = None
+
         self.create_header()
+
         self.create_stat_cards()
+
         self.create_main_section()
+
         self.create_secondary_section()
+
         self.create_today_section()
 
         self.refresh_dashboard()
@@ -54,15 +79,21 @@ class DashboardPage(
 
         if current_hour < 12:
 
-            greeting = "Good Morning"
+            greeting = (
+                "Good Morning"
+            )
 
         elif current_hour < 18:
 
-            greeting = "Good Afternoon"
+            greeting = (
+                "Good Afternoon"
+            )
 
         else:
 
-            greeting = "Good Evening"
+            greeting = (
+                "Good Evening"
+            )
 
         ctk.CTkLabel(
             self,
@@ -99,10 +130,14 @@ class DashboardPage(
         )
 
     # =================================================
-    # STATS
+    # STAT CARDS
     # =================================================
 
     def create_stat_cards(self):
+
+        # ---------------------------------------------
+        # TASKS
+        # ---------------------------------------------
 
         self.tasks_value = (
             self.create_stat_card(
@@ -113,6 +148,10 @@ class DashboardPage(
             )
         )
 
+        # ---------------------------------------------
+        # FOCUS
+        # ---------------------------------------------
+
         self.focus_value = (
             self.create_stat_card(
                 1,
@@ -121,6 +160,10 @@ class DashboardPage(
                 "Today"
             )
         )
+
+        # ---------------------------------------------
+        # POMODORO
+        # ---------------------------------------------
 
         self.pomodoro_value = (
             self.create_stat_card(
@@ -131,6 +174,10 @@ class DashboardPage(
             )
         )
 
+        # ---------------------------------------------
+        # PRODUCTIVITY
+        # ---------------------------------------------
+
         self.productivity_value = (
             self.create_stat_card(
                 3,
@@ -139,6 +186,10 @@ class DashboardPage(
                 "Today's Score"
             )
         )
+
+    # =================================================
+    # CREATE STAT CARD
+    # =================================================
 
     def create_stat_card(
         self,
@@ -179,12 +230,14 @@ class DashboardPage(
             pady=(18, 5)
         )
 
-        value_label = ctk.CTkLabel(
-            card,
-            text=value,
-            font=ctk.CTkFont(
-                size=28,
-                weight="bold"
+        value_label = (
+            ctk.CTkLabel(
+                card,
+                text=value,
+                font=ctk.CTkFont(
+                    size=28,
+                    weight="bold"
+                )
             )
         )
 
@@ -208,14 +261,14 @@ class DashboardPage(
         return value_label
 
     # =================================================
-    # MAIN
+    # MAIN SECTION
     # =================================================
 
     def create_main_section(self):
 
-        # -------------------------------------------------
-        # TASKS
-        # -------------------------------------------------
+        # =================================================
+        # TODAY'S TASKS
+        # =================================================
 
         tasks_card = ctk.CTkFrame(
             self,
@@ -258,9 +311,9 @@ class DashboardPage(
             pady=(0, 15)
         )
 
-        # -------------------------------------------------
+        # =================================================
         # QUICK FOCUS
-        # -------------------------------------------------
+        # =================================================
 
         focus_card = ctk.CTkFrame(
             self,
@@ -287,6 +340,10 @@ class DashboardPage(
             pady=(20, 10)
         )
 
+        # ---------------------------------------------
+        # TASK DROPDOWN
+        # ---------------------------------------------
+
         self.quick_focus_menu = (
             ctk.CTkOptionMenu(
                 focus_card,
@@ -304,6 +361,10 @@ class DashboardPage(
         self.quick_focus_menu.pack(
             pady=(5, 10)
         )
+
+        # ---------------------------------------------
+        # TIMER
+        # ---------------------------------------------
 
         self.focus_timer_label = (
             ctk.CTkLabel(
@@ -329,6 +390,10 @@ class DashboardPage(
             pady=5
         )
 
+        # ---------------------------------------------
+        # START
+        # ---------------------------------------------
+
         self.focus_button = (
             ctk.CTkButton(
                 focus_card,
@@ -344,18 +409,24 @@ class DashboardPage(
         )
 
     # =================================================
-    # SECONDARY
+    # SECONDARY SECTION
     # =================================================
 
     def create_secondary_section(self):
 
-        analytics_card = ctk.CTkFrame(
-            self,
-            corner_radius=15,
-            height=260
+        # =================================================
+        # WEEKLY PRODUCTIVITY
+        # =================================================
+
+        self.analytics_card = (
+            ctk.CTkFrame(
+                self,
+                corner_radius=15,
+                height=290
+            )
         )
 
-        analytics_card.grid(
+        self.analytics_card.grid(
             row=4,
             column=0,
             columnspan=2,
@@ -364,12 +435,12 @@ class DashboardPage(
             sticky="nsew"
         )
 
-        analytics_card.grid_propagate(
+        self.analytics_card.grid_propagate(
             False
         )
 
         ctk.CTkLabel(
-            analytics_card,
+            self.analytics_card,
             text="Weekly Productivity",
             font=ctk.CTkFont(
                 size=20,
@@ -378,20 +449,27 @@ class DashboardPage(
         ).pack(
             anchor="w",
             padx=20,
-            pady=20
+            pady=(18, 5)
         )
 
-        ctk.CTkLabel(
-            analytics_card,
-            text=(
-                "Productivity chart "
-                "will appear here."
+        self.weekly_chart_frame = (
+            ctk.CTkFrame(
+                self.analytics_card,
+                fg_color="transparent"
             )
-        ).pack(
-            expand=True
         )
 
-        # Quick Note
+        self.weekly_chart_frame.pack(
+            fill="both",
+            expand=True,
+            padx=10,
+            pady=(0, 10)
+        )
+
+        # =================================================
+        # QUICK NOTE
+        # =================================================
+
         notes_card = ctk.CTkFrame(
             self,
             corner_radius=15
@@ -419,9 +497,11 @@ class DashboardPage(
             pady=(20, 10)
         )
 
-        self.note_box = ctk.CTkTextbox(
-            notes_card,
-            height=130
+        self.note_box = (
+            ctk.CTkTextbox(
+                notes_card,
+                height=130
+            )
         )
 
         self.note_box.pack(
@@ -455,7 +535,7 @@ class DashboardPage(
         )
 
     # =================================================
-    # TODAY
+    # TODAY SECTION
     # =================================================
 
     def create_today_section(self):
@@ -484,9 +564,15 @@ class DashboardPage(
             weight=3
         )
 
-        date_frame = ctk.CTkFrame(
-            card,
-            fg_color="transparent"
+        # =================================================
+        # DATE
+        # =================================================
+
+        date_frame = (
+            ctk.CTkFrame(
+                card,
+                fg_color="transparent"
+            )
         )
 
         date_frame.grid(
@@ -497,7 +583,9 @@ class DashboardPage(
             pady=20
         )
 
-        now = datetime.now()
+        now = (
+            datetime.now()
+        )
 
         ctk.CTkLabel(
             date_frame,
@@ -536,9 +624,15 @@ class DashboardPage(
             anchor="w"
         )
 
-        plan_frame = ctk.CTkFrame(
-            card,
-            fg_color="transparent"
+        # =================================================
+        # TODAY'S PLAN
+        # =================================================
+
+        plan_frame = (
+            ctk.CTkFrame(
+                card,
+                fg_color="transparent"
+            )
         )
 
         plan_frame.grid(
@@ -574,19 +668,27 @@ class DashboardPage(
         )
 
     # =================================================
-    # REFRESH
+    # REFRESH DASHBOARD
     # =================================================
 
     def refresh_dashboard(self):
 
         self.load_task_statistics()
+
         self.load_focus_statistics()
+
+        self.load_productivity()
+
         self.load_dashboard_tasks()
+
         self.load_today_plan()
+
         self.load_quick_focus_tasks()
 
+        self.load_weekly_productivity()
+
     # =================================================
-    # STATISTICS
+    # TASK STATISTICS
     # =================================================
 
     def load_task_statistics(self):
@@ -602,6 +704,10 @@ class DashboardPage(
             )
         )
 
+    # =================================================
+    # FOCUS STATISTICS
+    # =================================================
+
     def load_focus_statistics(self):
 
         pomodoro = (
@@ -612,11 +718,21 @@ class DashboardPage(
             get_today_focus_stats()
         )
 
+        # ---------------------------------------------
+        # POMODORO COUNT
+        # ---------------------------------------------
+
         self.pomodoro_value.configure(
             text=str(
-                pomodoro["sessions"]
+                pomodoro[
+                    "sessions"
+                ]
             )
         )
+
+        # ---------------------------------------------
+        # TOTAL FOCUS TIME
+        # ---------------------------------------------
 
         total_seconds = (
             (
@@ -638,24 +754,205 @@ class DashboardPage(
         )
 
     # =================================================
-    # TASK LIST
+    # PRODUCTIVITY
     # =================================================
 
-    def load_dashboard_tasks(self):
+    def load_productivity(self):
+
+        metrics = (
+            get_productivity_metrics()
+        )
+
+        score = (
+            calculate_productivity_score(
+                metrics[
+                    "tasks_completed"
+                ],
+
+                metrics[
+                    "tasks_total"
+                ],
+
+                metrics[
+                    "focus_minutes"
+                ],
+
+                metrics[
+                    "planner_completed"
+                ],
+
+                metrics[
+                    "planner_total"
+                ]
+            )
+        )
+
+        self.productivity_value.configure(
+            text=f"{score}%"
+        )
+
+    # =================================================
+    # WEEKLY PRODUCTIVITY CHART
+    # =================================================
+
+    def load_weekly_productivity(self):
+
+        # ---------------------------------------------
+        # CLEAR OLD CHART
+        # ---------------------------------------------
 
         for widget in (
-            self.dashboard_tasks_container
+            self.weekly_chart_frame
             .winfo_children()
         ):
 
             widget.destroy()
 
-        tasks = get_today_tasks()
+        weekly = (
+            get_weekly_productivity_metrics(
+                7
+            )
+        )
+
+        labels = []
+        scores = []
+
+        for metrics in weekly:
+
+            try:
+
+                day = datetime.strptime(
+                    metrics["date"],
+                    "%Y-%m-%d"
+                )
+
+                label = day.strftime(
+                    "%a"
+                )
+
+            except Exception:
+
+                label = (
+                    metrics["date"]
+                )
+
+            labels.append(
+                label
+            )
+
+            score = (
+                calculate_productivity_score(
+                    metrics[
+                        "tasks_completed"
+                    ],
+                    metrics[
+                        "tasks_total"
+                    ],
+                    metrics[
+                        "focus_minutes"
+                    ],
+                    metrics[
+                        "planner_completed"
+                    ],
+                    metrics[
+                        "planner_total"
+                    ]
+                )
+            )
+
+            scores.append(
+                score
+            )
+
+        # ---------------------------------------------
+        # MATPLOTLIB FIGURE
+        # ---------------------------------------------
+
+        figure, axis = (
+            plt.subplots(
+                figsize=(5.4, 2.3)
+            )
+        )
+
+        sns.lineplot(
+            x=labels,
+            y=scores,
+            marker="o",
+            ax=axis
+        )
+
+        axis.set_ylim(
+            0,
+            100
+        )
+
+        axis.set_ylabel(
+            "Score"
+        )
+
+        axis.set_xlabel(
+            ""
+        )
+
+        axis.grid(
+            True,
+            alpha=0.2
+        )
+
+        figure.tight_layout()
+
+        # ---------------------------------------------
+        # EMBED IN CUSTOMTKINTER
+        # ---------------------------------------------
+
+        canvas = (
+            FigureCanvasTkAgg(
+                figure,
+                master=(
+                    self
+                    .weekly_chart_frame
+                )
+            )
+        )
+
+        canvas.draw()
+
+        canvas.get_tk_widget().pack(
+            fill="both",
+            expand=True
+        )
+
+        self.weekly_chart_canvas = (
+            canvas
+        )
+
+        plt.close(
+            figure
+        )
+
+    # =================================================
+    # DASHBOARD TASKS
+    # =================================================
+
+    def load_dashboard_tasks(self):
+
+        for widget in (
+            self
+            .dashboard_tasks_container
+            .winfo_children()
+        ):
+
+            widget.destroy()
+
+        tasks = (
+            get_today_tasks()
+        )
 
         if not tasks:
 
             ctk.CTkLabel(
-                self.dashboard_tasks_container,
+                self
+                .dashboard_tasks_container,
                 text="No tasks due today."
             ).pack(
                 anchor="w",
@@ -677,7 +974,8 @@ class DashboardPage(
             ) = task
 
             row = ctk.CTkFrame(
-                self.dashboard_tasks_container,
+                self
+                .dashboard_tasks_container,
                 fg_color="transparent"
             )
 
@@ -686,13 +984,15 @@ class DashboardPage(
                 pady=5
             )
 
-            checkbox = ctk.CTkCheckBox(
-                row,
-                text=title,
-                command=(
-                    lambda task_id=task_id:
-                    self.complete_dashboard_task(
-                        task_id
+            checkbox = (
+                ctk.CTkCheckBox(
+                    row,
+                    text=title,
+                    command=(
+                        lambda task_id=task_id:
+                        self.complete_dashboard_task(
+                            task_id
+                        )
                     )
                 )
             )
@@ -716,6 +1016,10 @@ class DashboardPage(
                 padx=5
             )
 
+    # =================================================
+    # COMPLETE TASK
+    # =================================================
+
     def complete_dashboard_task(
         self,
         task_id
@@ -729,29 +1033,42 @@ class DashboardPage(
         self.refresh_dashboard()
 
     # =================================================
-    # QUICK FOCUS LIST
+    # QUICK FOCUS TASKS
     # =================================================
 
     def load_quick_focus_tasks(self):
 
-        tasks = get_today_tasks(
-            limit=100
+        tasks = (
+            get_today_tasks(
+                limit=100
+            )
         )
 
-        current = (
-            self.quick_focus_menu.get()
+        current_value = (
+            self.quick_focus_menu
+            .get()
         )
+
+        # ---------------------------------------------
+        # GENERAL ALWAYS AVAILABLE
+        # ---------------------------------------------
 
         self.quick_focus_lookup = {
+
             "General": {
                 "id": None,
                 "title": "General"
             }
+
         }
 
         values = [
             "General"
         ]
+
+        # ---------------------------------------------
+        # TODAY'S TASKS
+        # ---------------------------------------------
 
         for task in tasks:
 
@@ -765,7 +1082,8 @@ class DashboardPage(
             ) = task
 
             display = (
-                f"{title} • {priority}"
+                f"{title} • "
+                f"{priority}"
             )
 
             values.append(
@@ -783,10 +1101,13 @@ class DashboardPage(
             values=values
         )
 
-        if current in values:
+        if (
+            current_value
+            in values
+        ):
 
             self.quick_focus_menu.set(
-                current
+                current_value
             )
 
         else:
@@ -796,16 +1117,19 @@ class DashboardPage(
             )
 
     # =================================================
-    # START QUICK FOCUS
+    # OPEN QUICK FOCUS
     # =================================================
 
     def open_quick_focus(self):
 
         selected = (
-            self.quick_focus_menu.get()
+            self.quick_focus_menu
+            .get()
         )
 
-        app = self.winfo_toplevel()
+        app = (
+            self.winfo_toplevel()
+        )
 
         if not hasattr(
             app,
@@ -813,6 +1137,10 @@ class DashboardPage(
         ):
 
             return
+
+        # ---------------------------------------------
+        # OPEN FOCUS PAGE
+        # ---------------------------------------------
 
         app.show_focus()
 
@@ -826,7 +1154,15 @@ class DashboardPage(
 
             return
 
+        # ---------------------------------------------
+        # REFRESH TASKS
+        # ---------------------------------------------
+
         focus_page.load_tasks()
+
+        # ---------------------------------------------
+        # SELECT CHOSEN ITEM
+        # ---------------------------------------------
 
         if (
             selected
@@ -837,7 +1173,14 @@ class DashboardPage(
                 selected
             )
 
-        if not focus_page.is_session_active():
+        # ---------------------------------------------
+        # START 25 MINUTES
+        # ---------------------------------------------
+
+        if not (
+            focus_page
+            .is_session_active()
+        ):
 
             focus_page.duration_menu.set(
                 "25 minutes"
@@ -867,7 +1210,9 @@ class DashboardPage(
         if not content:
 
             self.quick_note_message.configure(
-                text="Write something first."
+                text=(
+                    "Write something first."
+                )
             )
 
             return
@@ -876,7 +1221,8 @@ class DashboardPage(
             datetime.now()
             .strftime(
                 "Quick Note - "
-                "%d %b %Y %I:%M %p"
+                "%d %b %Y "
+                "%I:%M %p"
             )
         )
 
@@ -902,7 +1248,8 @@ class DashboardPage(
     def load_today_plan(self):
 
         for widget in (
-            self.planner_container
+            self
+            .planner_container
             .winfo_children()
         ):
 
@@ -917,7 +1264,8 @@ class DashboardPage(
         if not activities:
 
             ctk.CTkLabel(
-                self.planner_container,
+                self
+                .planner_container,
                 text=(
                     "Nothing planned "
                     "for today."
@@ -951,6 +1299,10 @@ class DashboardPage(
                 pady=5
             )
 
+            # -----------------------------------------
+            # TIME
+            # -----------------------------------------
+
             ctk.CTkLabel(
                 row,
                 text=self.format_time(
@@ -966,7 +1318,11 @@ class DashboardPage(
                 side="left"
             )
 
-            text = (
+            # -----------------------------------------
+            # TITLE
+            # -----------------------------------------
+
+            activity_text = (
                 f"✓ {title}"
                 if completed
                 else title
@@ -974,7 +1330,7 @@ class DashboardPage(
 
             ctk.CTkLabel(
                 row,
-                text=text,
+                text=activity_text,
                 font=ctk.CTkFont(
                     size=14
                 )
@@ -984,7 +1340,7 @@ class DashboardPage(
             )
 
     # =================================================
-    # HELPERS
+    # FORMAT PLANNER TIME
     # =================================================
 
     def format_time(
@@ -994,9 +1350,11 @@ class DashboardPage(
 
         try:
 
-            parsed = datetime.strptime(
-                value,
-                "%H:%M"
+            parsed = (
+                datetime.strptime(
+                    value,
+                    "%H:%M"
+                )
             )
 
             return (
@@ -1011,7 +1369,15 @@ class DashboardPage(
             TypeError
         ):
 
-            return value
+            return (
+                value
+                if value
+                else "--"
+            )
+
+    # =================================================
+    # FORMAT SECONDS
+    # =================================================
 
     def format_seconds(
         self,
@@ -1023,12 +1389,14 @@ class DashboardPage(
         )
 
         hours = (
-            seconds // 3600
+            seconds
+            // 3600
         )
 
         minutes = (
             (
-                seconds % 3600
+                seconds
+                % 3600
             )
             // 60
         )

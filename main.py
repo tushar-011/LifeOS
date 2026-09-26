@@ -13,10 +13,32 @@ from ui.stopwatch import StopwatchPage
 from ui.analytics import AnalyticsPage
 from ui.history import HistoryPage
 from ui.reports import ReportsPage
+from ui.settings import SettingsPage
 from ui.components import NavButton
 
 from database.database import (
     initialize_database
+)
+
+from utils.settings_manager import (
+    load_settings,
+    update_setting
+)
+
+
+# =================================================
+# LOAD APPLICATION SETTINGS
+# =================================================
+
+APP_SETTINGS = (
+    load_settings()
+)
+
+INITIAL_THEME = (
+    APP_SETTINGS.get(
+        "appearance_mode",
+        "Dark"
+    )
 )
 
 
@@ -25,7 +47,7 @@ from database.database import (
 # =================================================
 
 ctk.set_appearance_mode(
-    "dark"
+    INITIAL_THEME.lower()
 )
 
 ctk.set_default_color_theme(
@@ -34,7 +56,7 @@ ctk.set_default_color_theme(
 
 
 # =================================================
-# MAIN APPLICATION
+# APPLICATION
 # =================================================
 
 class LifeOSApp(ctk.CTk):
@@ -106,7 +128,7 @@ class LifeOSApp(ctk.CTk):
         self.create_content_area()
 
         # ---------------------------------------------
-        # TRACKPAD / MOUSE
+        # SCROLLING
         # ---------------------------------------------
 
         self.bind_all(
@@ -115,7 +137,7 @@ class LifeOSApp(ctk.CTk):
         )
 
         # ---------------------------------------------
-        # CLOSE APP
+        # CLOSE
         # ---------------------------------------------
 
         self.protocol(
@@ -130,7 +152,7 @@ class LifeOSApp(ctk.CTk):
         self.show_dashboard()
 
     # =================================================
-    # FOCUS MODE ACTIVE
+    # FOCUS SESSION CHECK
     # =================================================
 
     def focus_session_is_active(self):
@@ -157,7 +179,7 @@ class LifeOSApp(ctk.CTk):
             return False
 
     # =================================================
-    # STOP FOCUS CONFIRMATION
+    # FOCUS LEAVE CONFIRMATION
     # =================================================
 
     def request_stop_focus(self):
@@ -166,14 +188,20 @@ class LifeOSApp(ctk.CTk):
 
             return True
 
-        answer = messagebox.askyesno(
-            "Focus session active",
-            (
-                "A Focus Mode session is currently active.\n\n"
-                "Do you want to stop focus?\n\n"
-                "Your focused time so far will be saved."
-            ),
-            parent=self
+        answer = (
+            messagebox.askyesno(
+                "Focus session active",
+                (
+                    "A Focus Mode session is "
+                    "currently active.\n\n"
+
+                    "Do you want to stop focus?\n\n"
+
+                    "Your focused time so far "
+                    "will be saved."
+                ),
+                parent=self
+            )
         )
 
         if not answer:
@@ -207,7 +235,7 @@ class LifeOSApp(ctk.CTk):
         self.destroy()
 
     # =================================================
-    # SCROLLING
+    # MOUSE / TRACKPAD
     # =================================================
 
     def handle_mousewheel(
@@ -285,10 +313,12 @@ class LifeOSApp(ctk.CTk):
 
     def create_topbar(self):
 
-        self.topbar = ctk.CTkFrame(
-            self,
-            height=60,
-            corner_radius=0
+        self.topbar = (
+            ctk.CTkFrame(
+                self,
+                height=60,
+                corner_radius=0
+            )
         )
 
         self.topbar.grid(
@@ -326,7 +356,7 @@ class LifeOSApp(ctk.CTk):
         )
 
         # ---------------------------------------------
-        # TITLE
+        # APP NAME
         # ---------------------------------------------
 
         self.app_title = (
@@ -374,7 +404,7 @@ class LifeOSApp(ctk.CTk):
         )
 
         # ---------------------------------------------
-        # THEME
+        # THEME SWITCH
         # ---------------------------------------------
 
         self.theme_switch = (
@@ -385,13 +415,52 @@ class LifeOSApp(ctk.CTk):
             )
         )
 
-        self.theme_switch.select()
-
         self.theme_switch.grid(
             row=0,
             column=4,
             padx=(5, 20)
         )
+
+        self.sync_theme_controls()
+
+    # =================================================
+    # SYNC THEME CONTROL
+    # =================================================
+
+    def sync_theme_controls(self):
+
+        settings = (
+            load_settings()
+        )
+
+        theme = (
+            settings.get(
+                "appearance_mode",
+                "Dark"
+            )
+        )
+
+        if theme == "Light":
+
+            self.theme_switch.deselect()
+
+            self.theme_switch.configure(
+                text="Light"
+            )
+
+        elif theme == "Dark":
+
+            self.theme_switch.select()
+
+            self.theme_switch.configure(
+                text="Dark"
+            )
+
+        else:
+
+            self.theme_switch.configure(
+                text="System"
+            )
 
     # =================================================
     # SIDEBAR
@@ -530,10 +599,7 @@ class LifeOSApp(ctk.CTk):
                 self.sidebar,
                 text="Settings",
                 icon="⚙",
-                command=lambda:
-                self.show_placeholder(
-                    "Settings"
-                )
+                command=self.show_settings
             )
         )
 
@@ -580,7 +646,7 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # HIDE PAGES
+    # PAGE CACHE
     # =================================================
 
     def hide_all_pages(self):
@@ -592,7 +658,7 @@ class LifeOSApp(ctk.CTk):
             page.grid_remove()
 
     # =================================================
-    # PAGE MANAGEMENT
+    # SHOW PAGE
     # =================================================
 
     def show_page(
@@ -618,7 +684,7 @@ class LifeOSApp(ctk.CTk):
         self.hide_all_pages()
 
         # ---------------------------------------------
-        # CREATE ONLY ONCE
+        # CREATE PAGE ONCE
         # ---------------------------------------------
 
         if (
@@ -671,25 +737,40 @@ class LifeOSApp(ctk.CTk):
 
         try:
 
-            if page_name == "Dashboard":
+            if (
+                page_name
+                == "Dashboard"
+            ):
 
                 page.refresh_dashboard()
 
-            elif page_name == "Tasks":
+            elif (
+                page_name
+                == "Tasks"
+            ):
 
                 page.load_tasks()
 
-            elif page_name == "Notes":
+            elif (
+                page_name
+                == "Notes"
+            ):
 
                 page.load_notes()
 
-            elif page_name == "Planner":
+            elif (
+                page_name
+                == "Planner"
+            ):
 
                 page.build_calendar()
 
                 page.load_selected_day()
 
-            elif page_name == "Focus":
+            elif (
+                page_name
+                == "Focus"
+            ):
 
                 if not (
                     page.is_session_active()
@@ -698,32 +779,51 @@ class LifeOSApp(ctk.CTk):
                     page.load_tasks()
 
                 page.load_statistics()
-
                 page.load_history()
 
-            elif page_name == "Pomodoro":
+            elif (
+                page_name
+                == "Pomodoro"
+            ):
 
                 page.load_statistics()
-
                 page.load_history()
 
-            elif page_name == "Stopwatch":
+            elif (
+                page_name
+                == "Stopwatch"
+            ):
 
                 page.load_statistics()
-
                 page.load_history()
 
-            elif page_name == "Analytics":
+            elif (
+                page_name
+                == "Analytics"
+            ):
 
                 page.refresh_analytics()
 
-            elif page_name == "History":
+            elif (
+                page_name
+                == "History"
+            ):
 
                 page.refresh_history()
 
-            elif page_name == "Reports":
+            elif (
+                page_name
+                == "Reports"
+            ):
 
                 page.refresh_reports()
+
+            elif (
+                page_name
+                == "Settings"
+            ):
+
+                page.refresh_settings()
 
         except Exception as error:
 
@@ -807,91 +907,15 @@ class LifeOSApp(ctk.CTk):
             ReportsPage
         )
 
-    # =================================================
-    # PLACEHOLDER
-    # =================================================
+    def show_settings(self):
 
-    def show_placeholder(
-        self,
-        title
-    ):
-
-        if (
-            self.current_page == "Focus"
-            and self.focus_session_is_active()
-        ):
-
-            if not self.request_stop_focus():
-
-                return
-
-        page_name = (
-            f"placeholder_{title}"
-        )
-
-        self.hide_all_pages()
-
-        if (
-            page_name
-            not in self.pages
-        ):
-
-            page = ctk.CTkFrame(
-                self.content,
-                corner_radius=0,
-                fg_color="transparent"
-            )
-
-            page.grid(
-                row=0,
-                column=0,
-                sticky="nsew"
-            )
-
-            ctk.CTkLabel(
-                page,
-                text=title,
-                font=ctk.CTkFont(
-                    size=32,
-                    weight="bold"
-                )
-            ).pack(
-                anchor="nw",
-                padx=35,
-                pady=(30, 10)
-            )
-
-            ctk.CTkLabel(
-                page,
-                text=(
-                    f"{title} module "
-                    f"coming next."
-                )
-            ).pack(
-                anchor="nw",
-                padx=35
-            )
-
-            self.pages[
-                page_name
-            ] = page
-
-        else:
-
-            page = (
-                self.pages[
-                    page_name
-                ]
-            )
-
-            page.grid()
-
-        self.current_page = (
-            page_name
+        self.show_page(
+            "Settings",
+            SettingsPage
         )
 
     # =================================================
-    # SIDEBAR
+    # SIDEBAR TOGGLE
     # =================================================
 
     def toggle_sidebar(self):
@@ -928,34 +952,51 @@ class LifeOSApp(ctk.CTk):
             self.sidebar_open = True
 
     # =================================================
-    # THEME
+    # TOPBAR THEME SWITCH
     # =================================================
 
     def toggle_theme(self):
 
-        if self.theme_switch.get():
+        # The topbar only provides quick
+        # Dark / Light switching.
 
-            ctk.set_appearance_mode(
-                "dark"
-            )
+        if (
+            self.theme_switch.get()
+        ):
 
-            self.theme_switch.configure(
-                text="Dark"
-            )
+            theme = "Dark"
 
         else:
 
-            ctk.set_appearance_mode(
-                "light"
-            )
+            theme = "Light"
 
-            self.theme_switch.configure(
-                text="Light"
+        ctk.set_appearance_mode(
+            theme.lower()
+        )
+
+        update_setting(
+            "appearance_mode",
+            theme
+        )
+
+        self.theme_switch.configure(
+            text=theme
+        )
+
+        # Sync Settings page if created
+        settings_page = (
+            self.pages.get(
+                "Settings"
             )
+        )
+
+        if settings_page:
+
+            settings_page.refresh_settings()
 
 
 # =================================================
-# START APP
+# START APPLICATION
 # =================================================
 
 if __name__ == "__main__":

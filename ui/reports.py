@@ -1,12 +1,22 @@
 import customtkinter as ctk
 
 from datetime import datetime
-from tkinter import filedialog, messagebox
+from pathlib import Path
+
+from tkinter import (
+    filedialog,
+    messagebox
+)
 
 from database.database import (
     get_report_summary,
     get_report_completed_tasks,
     get_report_category_summary
+)
+
+from utils.settings_manager import (
+    get_setting,
+    get_default_export_path
 )
 
 
@@ -88,18 +98,11 @@ class ReportsPage(
             text=(
                 "Review completed tasks and "
                 "category performance."
-            ),
-            font=ctk.CTkFont(
-                size=14
             )
         ).pack(
             anchor="w",
             pady=(5, 0)
         )
-
-        # ---------------------------------------------
-        # EXPORT BUTTON
-        # ---------------------------------------------
 
         ctk.CTkButton(
             header,
@@ -108,12 +111,11 @@ class ReportsPage(
             height=40,
             command=self.export_report
         ).pack(
-            side="right",
-            padx=(10, 0)
+            side="right"
         )
 
     # =================================================
-    # PERIOD SELECTOR
+    # REPORT PERIOD
     # =================================================
 
     def create_period_selector(self):
@@ -162,8 +164,7 @@ class ReportsPage(
         )
 
         self.period_selector.pack(
-            side="left",
-            pady=15
+            side="left"
         )
 
         self.range_label = (
@@ -184,10 +185,6 @@ class ReportsPage(
 
     def create_summary_cards(self):
 
-        # ---------------------------------------------
-        # TASKS COMPLETED
-        # ---------------------------------------------
-
         self.tasks_value = (
             self.create_summary_card(
                 0,
@@ -196,10 +193,6 @@ class ReportsPage(
             )
         )
 
-        # ---------------------------------------------
-        # CATEGORIES
-        # ---------------------------------------------
-
         self.categories_value = (
             self.create_summary_card(
                 1,
@@ -207,10 +200,6 @@ class ReportsPage(
                 "0"
             )
         )
-
-        # ---------------------------------------------
-        # TOP CATEGORY
-        # ---------------------------------------------
 
         self.top_category_value = (
             self.create_summary_card(
@@ -277,7 +266,7 @@ class ReportsPage(
         return value_label
 
     # =================================================
-    # COMPLETED TASKS SECTION
+    # TASK SECTION
     # =================================================
 
     def create_tasks_section(self):
@@ -324,7 +313,7 @@ class ReportsPage(
         )
 
     # =================================================
-    # CATEGORY SUMMARY
+    # CATEGORY SECTION
     # =================================================
 
     def create_category_section(self):
@@ -370,7 +359,7 @@ class ReportsPage(
         )
 
     # =================================================
-    # CHANGE REPORT TYPE
+    # REPORT TYPE
     # =================================================
 
     def change_report_type(
@@ -423,11 +412,9 @@ class ReportsPage(
         )
 
         self.top_category_value.configure(
-            text=str(
-                summary[
-                    "top_category"
-                ]
-            )
+            text=summary[
+                "top_category"
+            ]
         )
 
         start = (
@@ -533,10 +520,6 @@ class ReportsPage(
                 pady=12
             )
 
-            # -----------------------------------------
-            # TITLE
-            # -----------------------------------------
-
             ctk.CTkLabel(
                 left,
                 text=title,
@@ -547,10 +530,6 @@ class ReportsPage(
             ).pack(
                 anchor="w"
             )
-
-            # -----------------------------------------
-            # DETAILS
-            # -----------------------------------------
 
             details = (
                 f"{category} • "
@@ -573,10 +552,6 @@ class ReportsPage(
                 anchor="w",
                 pady=(3, 0)
             )
-
-            # -----------------------------------------
-            # COMPLETION DATE
-            # -----------------------------------------
 
             history_date = (
                 completed_at
@@ -683,8 +658,8 @@ class ReportsPage(
             ctk.CTkLabel(
                 row,
                 text=(
-                    f"{count} tasks"
-                    f" • {percentage}%"
+                    f"{count} tasks "
+                    f"• {percentage}%"
                 )
             ).pack(
                 side="right",
@@ -692,7 +667,7 @@ class ReportsPage(
             )
 
     # =================================================
-    # EXPORT
+    # EXPORT TXT
     # =================================================
 
     def export_report(self):
@@ -715,9 +690,19 @@ class ReportsPage(
             )
         )
 
-        # ---------------------------------------------
-        # DEFAULT FILE NAME
-        # ---------------------------------------------
+        export_folder = (
+            get_setting(
+                "export_folder",
+                get_default_export_path()
+            )
+        )
+
+        Path(
+            export_folder
+        ).mkdir(
+            parents=True,
+            exist_ok=True
+        )
 
         filename = (
             f"LifeOS_"
@@ -731,6 +716,7 @@ class ReportsPage(
                 parent=self,
                 title="Export LifeOS Report",
                 defaultextension=".txt",
+                initialdir=export_folder,
                 initialfile=filename,
                 filetypes=[
                     (
@@ -744,10 +730,6 @@ class ReportsPage(
         if not file_path:
 
             return
-
-        # ---------------------------------------------
-        # BUILD REPORT
-        # ---------------------------------------------
 
         lines = []
 
@@ -784,10 +766,6 @@ class ReportsPage(
 
         lines.append("")
 
-        # ---------------------------------------------
-        # SUMMARY
-        # ---------------------------------------------
-
         lines.append(
             "-" * 60
         )
@@ -817,10 +795,6 @@ class ReportsPage(
 
         lines.append("")
 
-        # ---------------------------------------------
-        # TASKS
-        # ---------------------------------------------
-
         lines.append(
             "-" * 60
         )
@@ -835,7 +809,10 @@ class ReportsPage(
 
         if tasks:
 
-            for index, task in enumerate(
+            for (
+                index,
+                task
+            ) in enumerate(
                 tasks,
                 start=1
             ):
@@ -890,10 +867,6 @@ class ReportsPage(
             )
 
             lines.append("")
-
-        # ---------------------------------------------
-        # CATEGORY SUMMARY
-        # ---------------------------------------------
 
         lines.append(
             "-" * 60
@@ -960,10 +933,6 @@ class ReportsPage(
             "=" * 60
         )
 
-        # ---------------------------------------------
-        # WRITE FILE
-        # ---------------------------------------------
-
         try:
 
             with open(
@@ -1014,9 +983,11 @@ class ReportsPage(
 
         try:
 
-            parsed = datetime.strptime(
-                value,
-                "%Y-%m-%d %H:%M:%S"
+            parsed = (
+                datetime.strptime(
+                    value,
+                    "%Y-%m-%d %H:%M:%S"
+                )
             )
 
             return parsed.strftime(
@@ -1035,9 +1006,11 @@ class ReportsPage(
 
         try:
 
-            parsed = datetime.strptime(
-                value,
-                "%Y-%m-%d"
+            parsed = (
+                datetime.strptime(
+                    value,
+                    "%Y-%m-%d"
+                )
             )
 
             return parsed.strftime(

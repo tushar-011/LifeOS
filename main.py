@@ -7,6 +7,7 @@ from ui.components import NavButton
 
 from database.database import initialize_database
 
+from ui.notes import NotesPage
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -186,7 +187,7 @@ class LifeOSApp(ctk.CTk):
             (
                 "Notes",
                 "▤",
-                lambda: self.show_placeholder("Notes")
+                self.show_notes
             ),
 
             (
@@ -314,6 +315,19 @@ class LifeOSApp(ctk.CTk):
         self.clear_content()
 
         page = TasksPage(
+            self.content
+        )
+
+        page.grid(
+            row=0,
+            column=0,
+            sticky="nsew"
+        )
+        
+    def show_notes(self):
+        self.clear_content()
+
+        page = NotesPage(
             self.content
         )
 

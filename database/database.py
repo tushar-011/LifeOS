@@ -46,6 +46,19 @@ def initialize_database():
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT DEFAULT 'General',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    
     connection.commit()
     connection.close()
 
@@ -323,3 +336,169 @@ def get_today_tasks(limit=5):
     connection.close()
 
     return tasks
+
+# =================================================
+# NOTES
+# =================================================
+
+
+def add_note(
+    title,
+    content,
+    category="General"
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO notes (
+            title,
+            content,
+            category
+        )
+        VALUES (?, ?, ?)
+        """,
+        (
+            title,
+            content,
+            category
+        )
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def get_notes(
+    search_text="",
+    category="All Categories"
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    query = """
+        SELECT
+            id,
+            title,
+            content,
+            category,
+            created_at,
+            updated_at
+        FROM notes
+        WHERE 1 = 1
+    """
+
+    parameters = []
+
+    if search_text:
+
+        query += """
+            AND (
+                title LIKE ?
+                OR content LIKE ?
+            )
+        """
+
+        search_pattern = f"%{search_text}%"
+
+        parameters.extend([
+            search_pattern,
+            search_pattern
+        ])
+
+    if category != "All Categories":
+
+        query += """
+            AND category = ?
+        """
+
+        parameters.append(category)
+
+    query += """
+        ORDER BY updated_at DESC, id DESC
+    """
+
+    cursor.execute(
+        query,
+        parameters
+    )
+
+    notes = cursor.fetchall()
+
+    connection.close()
+
+    return notes
+
+
+def update_note(
+    note_id,
+    title,
+    content,
+    category
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        UPDATE notes
+
+        SET
+            title = ?,
+            content = ?,
+            category = ?,
+            updated_at = CURRENT_TIMESTAMP
+
+        WHERE id = ?
+        """,
+        (
+            title,
+            content,
+            category,
+            note_id
+        )
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def delete_note(note_id):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        DELETE FROM notes
+        WHERE id = ?
+        """,
+        (note_id,)
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def get_note_count():
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM notes
+        """
+    )
+
+    count = cursor.fetchone()[0]
+
+    connection.close()
+
+    return count
+

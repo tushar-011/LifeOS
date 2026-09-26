@@ -5,7 +5,8 @@ from datetime import datetime
 from database.database import (
     get_task_statistics,
     get_today_tasks,
-    toggle_task
+    toggle_task,
+    add_note
 )
 
 
@@ -237,11 +238,9 @@ class DashboardPage(ctk.CTkScrollableFrame):
             pady=(0, 8)
         )
 
-        self.dashboard_tasks_container = (
-            ctk.CTkFrame(
-                tasks_card,
-                fg_color="transparent"
-            )
+        self.dashboard_tasks_container = ctk.CTkFrame(
+            tasks_card,
+            fg_color="transparent"
         )
 
         self.dashboard_tasks_container.pack(
@@ -404,10 +403,21 @@ class DashboardPage(ctk.CTkScrollableFrame):
             pady=10
         )
 
+        self.quick_note_message = ctk.CTkLabel(
+            notes_card,
+            text=""
+        )
+
+        self.quick_note_message.pack(
+            anchor="w",
+            padx=20
+        )
+
         ctk.CTkButton(
             notes_card,
             text="Save Note",
-            width=120
+            width=120,
+            command=self.save_quick_note
         ).pack(
             anchor="e",
             padx=20,
@@ -579,3 +589,44 @@ class DashboardPage(ctk.CTkScrollableFrame):
         )
 
         self.refresh_dashboard()
+
+    # =================================================
+    # QUICK NOTE
+    # =================================================
+
+    def save_quick_note(self):
+
+        content = (
+            self.note_box
+            .get("1.0", "end")
+            .strip()
+        )
+
+        if not content:
+
+            self.quick_note_message.configure(
+                text="Write something first."
+            )
+
+            return
+
+        current_time = datetime.now()
+
+        title = current_time.strftime(
+            "Quick Note - %d %b %Y %I:%M %p"
+        )
+
+        add_note(
+            title,
+            content,
+            "General"
+        )
+
+        self.note_box.delete(
+            "1.0",
+            "end"
+        )
+
+        self.quick_note_message.configure(
+            text="Note saved."
+        )

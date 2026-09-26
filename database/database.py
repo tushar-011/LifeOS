@@ -44,9 +44,9 @@ def initialize_database():
     connection = get_connection()
     cursor = connection.cursor()
 
-    # -------------------------------------------------
+    # =================================================
     # TASKS
-    # -------------------------------------------------
+    # =================================================
 
     cursor.execute(
         """
@@ -63,9 +63,9 @@ def initialize_database():
         """
     )
 
-    # -------------------------------------------------
+    # =================================================
     # NOTES
-    # -------------------------------------------------
+    # =================================================
 
     cursor.execute(
         """
@@ -80,9 +80,9 @@ def initialize_database():
         """
     )
 
-    # -------------------------------------------------
+    # =================================================
     # PLANNER
-    # -------------------------------------------------
+    # =================================================
 
     cursor.execute(
         """
@@ -99,9 +99,9 @@ def initialize_database():
         """
     )
 
-    # -------------------------------------------------
+    # =================================================
     # POMODORO
-    # -------------------------------------------------
+    # =================================================
 
     cursor.execute(
         """
@@ -114,9 +114,9 @@ def initialize_database():
         """
     )
 
-    # -------------------------------------------------
+    # =================================================
     # STOPWATCH
-    # -------------------------------------------------
+    # =================================================
 
     cursor.execute(
         """
@@ -128,6 +128,71 @@ def initialize_database():
         )
         """
     )
+
+    # =================================================
+    # FOCUS MODE
+    # =================================================
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS focus_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER,
+            task_title TEXT NOT NULL,
+            duration_minutes INTEGER NOT NULL,
+            actual_seconds INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'Completed',
+            completed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (task_id)
+            REFERENCES tasks(id)
+        )
+        """
+    )
+
+    # =================================================
+    # DATABASE MIGRATION
+    # =================================================
+    # This upgrades an older focus_sessions table
+    # without deleting the user's existing database.
+    # =================================================
+
+    cursor.execute(
+        """
+        PRAGMA table_info(focus_sessions)
+        """
+    )
+
+    focus_columns = [
+        column[1]
+        for column in cursor.fetchall()
+    ]
+
+    if (
+        "actual_seconds"
+        not in focus_columns
+    ):
+
+        cursor.execute(
+            """
+            ALTER TABLE focus_sessions
+            ADD COLUMN actual_seconds
+            INTEGER DEFAULT 0
+            """
+        )
+
+    if (
+        "status"
+        not in focus_columns
+    ):
+
+        cursor.execute(
+            """
+            ALTER TABLE focus_sessions
+            ADD COLUMN status
+            TEXT DEFAULT 'Completed'
+            """
+        )
 
     connection.commit()
     connection.close()
@@ -194,22 +259,93 @@ def get_tasks():
             completed ASC,
 
             CASE
+
                 WHEN due_date IS NULL
                 OR due_date = ''
+
                 THEN 1
+
                 ELSE 0
+
             END ASC,
 
             due_date ASC,
 
             CASE priority
-                WHEN 'High' THEN 1
-                WHEN 'Medium' THEN 2
-                WHEN 'Low' THEN 3
+
+                WHEN 'High'
+                THEN 1
+
+                WHEN 'Medium'
+                THEN 2
+
+                WHEN 'Low'
+                THEN 3
+
                 ELSE 4
+
             END ASC,
 
             id DESC
+        """
+    )
+
+    tasks = cursor.fetchall()
+
+    connection.close()
+
+    return tasks
+
+
+def get_pending_tasks():
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            title,
+            due_date,
+            priority,
+            category
+
+        FROM tasks
+
+        WHERE completed = 0
+
+        ORDER BY
+
+            CASE
+
+                WHEN due_date IS NULL
+                OR due_date = ''
+
+                THEN 1
+
+                ELSE 0
+
+            END,
+
+            due_date ASC,
+
+            CASE priority
+
+                WHEN 'High'
+                THEN 1
+
+                WHEN 'Medium'
+                THEN 2
+
+                WHEN 'Low'
+                THEN 3
+
+                ELSE 4
+
+            END,
+
+            id ASC
         """
     )
 
@@ -270,7 +406,9 @@ def toggle_task(
     cursor.execute(
         """
         UPDATE tasks
+
         SET completed = ?
+
         WHERE id = ?
         """,
         (
@@ -293,9 +431,12 @@ def delete_task(
     cursor.execute(
         """
         DELETE FROM tasks
+
         WHERE id = ?
         """,
-        (task_id,)
+        (
+            task_id,
+        )
     )
 
     connection.commit()
@@ -310,6 +451,7 @@ def get_task_statistics():
     cursor.execute(
         """
         SELECT COUNT(*)
+
         FROM tasks
         """
     )
@@ -319,7 +461,9 @@ def get_task_statistics():
     cursor.execute(
         """
         SELECT COUNT(*)
+
         FROM tasks
+
         WHERE completed = 1
         """
     )
@@ -331,7 +475,9 @@ def get_task_statistics():
     return {
         "total": total,
         "completed": completed,
-        "pending": total - completed
+        "pending": (
+            total - completed
+        )
     }
 
 
@@ -364,12 +510,21 @@ def get_today_tasks(
             AND due_date = ?
 
         ORDER BY
+
             CASE priority
-                WHEN 'High' THEN 1
-                WHEN 'Medium' THEN 2
-                WHEN 'Low' THEN 3
+
+                WHEN 'High'
+                THEN 1
+
+                WHEN 'Medium'
+                THEN 2
+
+                WHEN 'Low'
+                THEN 3
+
                 ELSE 4
-            END ASC,
+
+            END,
 
             id ASC
 
@@ -389,7 +544,7 @@ def get_today_tasks(
 
 
 # =================================================
-# NOTE FUNCTIONS
+# NOTES
 # =================================================
 
 def add_note(
@@ -465,7 +620,10 @@ def get_notes(
             ]
         )
 
-    if category != "All Categories":
+    if (
+        category
+        != "All Categories"
+    ):
 
         query += """
             AND category = ?
@@ -537,9 +695,12 @@ def delete_note(
     cursor.execute(
         """
         DELETE FROM notes
+
         WHERE id = ?
         """,
-        (note_id,)
+        (
+            note_id,
+        )
     )
 
     connection.commit()
@@ -554,6 +715,7 @@ def get_note_count():
     cursor.execute(
         """
         SELECT COUNT(*)
+
         FROM notes
         """
     )
@@ -566,7 +728,7 @@ def get_note_count():
 
 
 # =================================================
-# PLANNER FUNCTIONS
+# PLANNER
 # =================================================
 
 def add_planner_activity(
@@ -633,7 +795,9 @@ def get_planner_activities(
                 start_time ASC,
                 id ASC
             """,
-            (activity_date,)
+            (
+                activity_date,
+            )
         )
 
     else:
@@ -676,7 +840,9 @@ def toggle_planner_activity(
     cursor.execute(
         """
         UPDATE planner
+
         SET completed = ?
+
         WHERE id = ?
         """,
         (
@@ -699,9 +865,12 @@ def delete_planner_activity(
     cursor.execute(
         """
         DELETE FROM planner
+
         WHERE id = ?
         """,
-        (activity_id,)
+        (
+            activity_id,
+        )
     )
 
     connection.commit()
@@ -756,7 +925,7 @@ def get_today_planner(
 
 
 # =================================================
-# POMODORO FUNCTIONS
+# POMODORO
 # =================================================
 
 def add_pomodoro_session(
@@ -809,9 +978,14 @@ def get_today_pomodoro_stats():
 
         WHERE
             session_type = 'Focus'
-            AND DATE(completed_at) = ?
+
+            AND DATE(
+                completed_at
+            ) = ?
         """,
-        (today,)
+        (
+            today,
+        )
     )
 
     result = cursor.fetchone()
@@ -845,7 +1019,9 @@ def get_recent_pomodoro_sessions(
 
         LIMIT ?
         """,
-        (limit,)
+        (
+            limit,
+        )
     )
 
     sessions = cursor.fetchall()
@@ -856,7 +1032,7 @@ def get_recent_pomodoro_sessions(
 
 
 # =================================================
-# STOPWATCH FUNCTIONS
+# STOPWATCH
 # =================================================
 
 def add_stopwatch_session(
@@ -907,9 +1083,13 @@ def get_today_stopwatch_stats():
 
         FROM stopwatch_sessions
 
-        WHERE DATE(completed_at) = ?
+        WHERE DATE(
+            completed_at
+        ) = ?
         """,
-        (today,)
+        (
+            today,
+        )
     )
 
     result = cursor.fetchone()
@@ -943,7 +1123,175 @@ def get_recent_stopwatch_sessions(
 
         LIMIT ?
         """,
-        (limit,)
+        (
+            limit,
+        )
+    )
+
+    sessions = cursor.fetchall()
+
+    connection.close()
+
+    return sessions
+
+
+# =================================================
+# FOCUS MODE
+# =================================================
+
+def add_focus_session(
+    task_id,
+    task_title,
+    duration_minutes,
+    actual_seconds=None,
+    status="Completed"
+):
+
+    # -------------------------------------------------
+    # If an old caller does not provide actual time,
+    # assume the whole selected duration completed.
+    # -------------------------------------------------
+
+    if actual_seconds is None:
+
+        actual_seconds = (
+            duration_minutes
+            * 60
+        )
+
+    # Prevent negative values
+    actual_seconds = max(
+        0,
+        int(actual_seconds)
+    )
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO focus_sessions (
+            task_id,
+            task_title,
+            duration_minutes,
+            actual_seconds,
+            status
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            task_id,
+            task_title,
+            duration_minutes,
+            actual_seconds,
+            status
+        )
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def get_today_focus_stats():
+
+    today = (
+        date.today()
+        .isoformat()
+    )
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            COUNT(*),
+
+            COALESCE(
+                SUM(
+                    CASE
+
+                        WHEN actual_seconds > 0
+                        THEN actual_seconds
+
+                        ELSE duration_minutes * 60
+
+                    END
+                ),
+                0
+            )
+
+        FROM focus_sessions
+
+        WHERE DATE(
+            completed_at
+        ) = ?
+        """,
+        (
+            today,
+        )
+    )
+
+    result = cursor.fetchone()
+
+    connection.close()
+
+    sessions = (
+        result[0]
+        if result
+        else 0
+    )
+
+    total_seconds = (
+        result[1]
+        if (
+            result
+            and result[1]
+        )
+        else 0
+    )
+
+    return {
+        "sessions": sessions,
+
+        "focus_seconds":
+            total_seconds,
+
+        "focus_minutes":
+            round(
+                total_seconds
+                / 60
+            )
+    }
+
+
+def get_recent_focus_sessions(
+    limit=10
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            task_id,
+            task_title,
+            duration_minutes,
+            actual_seconds,
+            status,
+            completed_at
+
+        FROM focus_sessions
+
+        ORDER BY id DESC
+
+        LIMIT ?
+        """,
+        (
+            limit,
+        )
     )
 
     sessions = cursor.fetchall()

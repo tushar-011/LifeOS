@@ -1,11 +1,13 @@
 import customtkinter as ctk
 
 from datetime import datetime
+from tkinter import messagebox
 
 from ui.dashboard import DashboardPage
 from ui.tasks import TasksPage
 from ui.notes import NotesPage
 from ui.planner import PlannerPage
+from ui.focus_mode import FocusModePage
 from ui.pomodoro import PomodoroPage
 from ui.stopwatch import StopwatchPage
 from ui.components import NavButton
@@ -50,9 +52,7 @@ class LifeOSApp(ctk.CTk):
         self.sidebar_width = 220
         self.sidebar_collapsed_width = 72
 
-        # Page cache
         self.pages = {}
-
         self.current_page = None
 
         self.grid_rowconfigure(
@@ -75,10 +75,81 @@ class LifeOSApp(ctk.CTk):
             self.handle_mousewheel
         )
 
+        # Handle app close
+        self.protocol(
+            "WM_DELETE_WINDOW",
+            self.handle_close
+        )
+
         self.show_dashboard()
 
     # =================================================
-    # TRACKPAD / MOUSE WHEEL
+    # FOCUS PROTECTION
+    # =================================================
+
+    def focus_session_is_active(self):
+
+        focus_page = self.pages.get(
+            "Focus"
+        )
+
+        if focus_page is None:
+
+            return False
+
+        return (
+            focus_page
+            .is_session_active()
+        )
+
+    def request_stop_focus(self):
+
+        if not self.focus_session_is_active():
+
+            return True
+
+        answer = messagebox.askyesno(
+            "Focus session active",
+            (
+                "A Focus Mode session is currently active.\n\n"
+                "Do you want to stop focus?\n\n"
+                "Your focused time so far will be saved."
+            ),
+            parent=self
+        )
+
+        if not answer:
+
+            return False
+
+        focus_page = (
+            self.pages.get(
+                "Focus"
+            )
+        )
+
+        if focus_page:
+
+            focus_page.stop_focus_session(
+                save=True
+            )
+
+        return True
+
+    # =================================================
+    # CLOSE APPLICATION
+    # =================================================
+
+    def handle_close(self):
+
+        if not self.request_stop_focus():
+
+            return
+
+        self.destroy()
+
+    # =================================================
+    # MOUSE / TRACKPAD
     # =================================================
 
     def handle_mousewheel(
@@ -97,10 +168,7 @@ class LifeOSApp(ctk.CTk):
 
             current_widget = widget
 
-            while (
-                current_widget
-                is not None
-            ):
+            while current_widget is not None:
 
                 if isinstance(
                     current_widget,
@@ -128,7 +196,8 @@ class LifeOSApp(ctk.CTk):
                     )
 
                     canvas.yview_scroll(
-                        direction * magnitude,
+                        direction
+                        * magnitude,
                         "units"
                     )
 
@@ -172,15 +241,12 @@ class LifeOSApp(ctk.CTk):
             weight=1
         )
 
-        self.menu_button = (
-            ctk.CTkButton(
-                self.topbar,
-                text="☰",
-                width=42,
-                height=38,
-                corner_radius=10,
-                command=self.toggle_sidebar
-            )
+        self.menu_button = ctk.CTkButton(
+            self.topbar,
+            text="☰",
+            width=42,
+            height=38,
+            command=self.toggle_sidebar
         )
 
         self.menu_button.grid(
@@ -190,14 +256,12 @@ class LifeOSApp(ctk.CTk):
             pady=10
         )
 
-        self.app_title = (
-            ctk.CTkLabel(
-                self.topbar,
-                text="LifeOS",
-                font=ctk.CTkFont(
-                    size=24,
-                    weight="bold"
-                )
+        self.app_title = ctk.CTkLabel(
+            self.topbar,
+            text="LifeOS",
+            font=ctk.CTkFont(
+                size=24,
+                weight="bold"
             )
         )
 
@@ -217,10 +281,7 @@ class LifeOSApp(ctk.CTk):
         self.date_label = (
             ctk.CTkLabel(
                 self.topbar,
-                text=date_text,
-                font=ctk.CTkFont(
-                    size=14
-                )
+                text=date_text
             )
         )
 
@@ -276,52 +337,41 @@ class LifeOSApp(ctk.CTk):
         self.nav_buttons = []
 
         navigation = [
-
             (
                 "Dashboard",
                 "⌂",
                 self.show_dashboard
             ),
-
             (
                 "Tasks",
                 "✓",
                 self.show_tasks
             ),
-
             (
                 "Planner",
                 "▦",
                 self.show_planner
             ),
-
             (
                 "Focus",
                 "◎",
-                lambda:
-                self.show_placeholder(
-                    "Focus Mode"
-                )
+                self.show_focus
             ),
-
             (
                 "Pomodoro",
                 "◷",
                 self.show_pomodoro
             ),
-
             (
                 "Stopwatch",
                 "◴",
                 self.show_stopwatch
             ),
-
             (
                 "Notes",
                 "▤",
                 self.show_notes
             ),
-
             (
                 "Analytics",
                 "▥",
@@ -330,7 +380,6 @@ class LifeOSApp(ctk.CTk):
                     "Analytics"
                 )
             ),
-
             (
                 "History",
                 "↺",
@@ -339,7 +388,6 @@ class LifeOSApp(ctk.CTk):
                     "History"
                 )
             ),
-
             (
                 "Reports",
                 "▧",
@@ -384,15 +432,13 @@ class LifeOSApp(ctk.CTk):
             weight=1
         )
 
-        self.settings_button = (
-            NavButton(
-                self.sidebar,
-                text="Settings",
-                icon="⚙",
-                command=lambda:
-                self.show_placeholder(
-                    "Settings"
-                )
+        self.settings_button = NavButton(
+            self.sidebar,
+            text="Settings",
+            icon="⚙",
+            command=lambda:
+            self.show_placeholder(
+                "Settings"
             )
         )
 
@@ -454,6 +500,20 @@ class LifeOSApp(ctk.CTk):
         page_class
     ):
 
+        # ---------------------------------------------
+        # BLOCK NAVIGATION DURING FOCUS
+        # ---------------------------------------------
+
+        if (
+            self.current_page == "Focus"
+            and page_name != "Focus"
+            and self.focus_session_is_active()
+        ):
+
+            if not self.request_stop_focus():
+
+                return
+
         self.hide_all_pages()
 
         if (
@@ -477,9 +537,11 @@ class LifeOSApp(ctk.CTk):
 
         else:
 
-            page = self.pages[
-                page_name
-            ]
+            page = (
+                self.pages[
+                    page_name
+                ]
+            )
 
             page.grid()
 
@@ -493,7 +555,7 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # PAGE REFRESH
+    # REFRESH
     # =================================================
 
     def refresh_page(
@@ -504,47 +566,39 @@ class LifeOSApp(ctk.CTk):
 
         try:
 
-            if (
-                page_name
-                == "Dashboard"
-            ):
+            if page_name == "Dashboard":
 
                 page.refresh_dashboard()
 
-            elif (
-                page_name
-                == "Tasks"
-            ):
+            elif page_name == "Tasks":
 
                 page.load_tasks()
 
-            elif (
-                page_name
-                == "Notes"
-            ):
+            elif page_name == "Notes":
 
                 page.load_notes()
 
-            elif (
-                page_name
-                == "Planner"
-            ):
+            elif page_name == "Planner":
 
                 page.build_calendar()
                 page.load_selected_day()
 
-            elif (
-                page_name
-                == "Pomodoro"
-            ):
+            elif page_name == "Focus":
+
+                # Don't disturb active timer
+                if not page.is_session_active():
+
+                    page.load_tasks()
 
                 page.load_statistics()
                 page.load_history()
 
-            elif (
-                page_name
-                == "Stopwatch"
-            ):
+            elif page_name == "Pomodoro":
+
+                page.load_statistics()
+                page.load_history()
+
+            elif page_name == "Stopwatch":
 
                 page.load_statistics()
                 page.load_history()
@@ -554,7 +608,7 @@ class LifeOSApp(ctk.CTk):
             pass
 
     # =================================================
-    # DASHBOARD
+    # PAGES
     # =================================================
 
     def show_dashboard(self):
@@ -564,20 +618,12 @@ class LifeOSApp(ctk.CTk):
             DashboardPage
         )
 
-    # =================================================
-    # TASKS
-    # =================================================
-
     def show_tasks(self):
 
         self.show_page(
             "Tasks",
             TasksPage
         )
-
-    # =================================================
-    # PLANNER
-    # =================================================
 
     def show_planner(self):
 
@@ -586,9 +632,12 @@ class LifeOSApp(ctk.CTk):
             PlannerPage
         )
 
-    # =================================================
-    # POMODORO
-    # =================================================
+    def show_focus(self):
+
+        self.show_page(
+            "Focus",
+            FocusModePage
+        )
 
     def show_pomodoro(self):
 
@@ -597,20 +646,12 @@ class LifeOSApp(ctk.CTk):
             PomodoroPage
         )
 
-    # =================================================
-    # STOPWATCH
-    # =================================================
-
     def show_stopwatch(self):
 
         self.show_page(
             "Stopwatch",
             StopwatchPage
         )
-
-    # =================================================
-    # NOTES
-    # =================================================
 
     def show_notes(self):
 
@@ -628,16 +669,23 @@ class LifeOSApp(ctk.CTk):
         title
     ):
 
+        # Prevent leaving active Focus Mode
+        if (
+            self.current_page == "Focus"
+            and self.focus_session_is_active()
+        ):
+
+            if not self.request_stop_focus():
+
+                return
+
         page_name = (
             f"placeholder_{title}"
         )
 
         self.hide_all_pages()
 
-        if (
-            page_name
-            not in self.pages
-        ):
+        if page_name not in self.pages:
 
             page = ctk.CTkFrame(
                 self.content,
@@ -669,9 +717,6 @@ class LifeOSApp(ctk.CTk):
                 text=(
                     f"{title} module "
                     f"coming next."
-                ),
-                font=ctk.CTkFont(
-                    size=15
                 )
             ).pack(
                 anchor="nw",
@@ -684,9 +729,11 @@ class LifeOSApp(ctk.CTk):
 
         else:
 
-            page = self.pages[
-                page_name
-            ]
+            page = (
+                self.pages[
+                    page_name
+                ]
+            )
 
             page.grid()
 
@@ -695,7 +742,7 @@ class LifeOSApp(ctk.CTk):
         )
 
     # =================================================
-    # SIDEBAR TOGGLE
+    # SIDEBAR
     # =================================================
 
     def toggle_sidebar(self):
@@ -720,9 +767,7 @@ class LifeOSApp(ctk.CTk):
         else:
 
             self.sidebar.configure(
-                width=(
-                    self.sidebar_width
-                )
+                width=self.sidebar_width
             )
 
             for button in (

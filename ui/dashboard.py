@@ -8,13 +8,19 @@ from database.database import (
     toggle_task,
     add_note,
     get_today_planner,
-    get_today_pomodoro_stats
+    get_today_pomodoro_stats,
+    get_today_focus_stats
 )
 
 
-class DashboardPage(ctk.CTkScrollableFrame):
+class DashboardPage(
+    ctk.CTkScrollableFrame
+):
 
-    def __init__(self, parent):
+    def __init__(
+        self,
+        parent
+    ):
 
         super().__init__(
             parent,
@@ -25,6 +31,8 @@ class DashboardPage(ctk.CTkScrollableFrame):
             (0, 1, 2, 3),
             weight=1
         )
+
+        self.quick_focus_lookup = {}
 
         self.create_header()
         self.create_stat_cards()
@@ -45,12 +53,15 @@ class DashboardPage(ctk.CTkScrollableFrame):
         )
 
         if current_hour < 12:
+
             greeting = "Good Morning"
 
         elif current_hour < 18:
+
             greeting = "Good Afternoon"
 
         else:
+
             greeting = "Good Evening"
 
         ctk.CTkLabel(
@@ -71,7 +82,10 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
         ctk.CTkLabel(
             self,
-            text="Here's your day at a glance.",
+            text=(
+                "Here's your day "
+                "at a glance."
+            ),
             font=ctk.CTkFont(
                 size=15
             )
@@ -85,7 +99,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
         )
 
     # =================================================
-    # STAT CARDS
+    # STATS
     # =================================================
 
     def create_stat_cards(self):
@@ -194,10 +208,14 @@ class DashboardPage(ctk.CTkScrollableFrame):
         return value_label
 
     # =================================================
-    # MAIN SECTION
+    # MAIN
     # =================================================
 
     def create_main_section(self):
+
+        # -------------------------------------------------
+        # TASKS
+        # -------------------------------------------------
 
         tasks_card = ctk.CTkFrame(
             self,
@@ -240,6 +258,10 @@ class DashboardPage(ctk.CTkScrollableFrame):
             pady=(0, 15)
         )
 
+        # -------------------------------------------------
+        # QUICK FOCUS
+        # -------------------------------------------------
+
         focus_card = ctk.CTkFrame(
             self,
             corner_radius=15
@@ -262,7 +284,25 @@ class DashboardPage(ctk.CTkScrollableFrame):
                 weight="bold"
             )
         ).pack(
-            pady=(25, 10)
+            pady=(20, 10)
+        )
+
+        self.quick_focus_menu = (
+            ctk.CTkOptionMenu(
+                focus_card,
+                values=[
+                    "General"
+                ],
+                width=300
+            )
+        )
+
+        self.quick_focus_menu.set(
+            "General"
+        )
+
+        self.quick_focus_menu.pack(
+            pady=(5, 10)
         )
 
         self.focus_timer_label = (
@@ -277,21 +317,30 @@ class DashboardPage(ctk.CTkScrollableFrame):
         )
 
         self.focus_timer_label.pack(
-            pady=15
+            pady=5
         )
 
-        self.focus_task_label = (
-            ctk.CTkLabel(
+        ctk.CTkLabel(
+            focus_card,
+            text=(
+                "25 minute Focus Mode session"
+            )
+        ).pack(
+            pady=5
+        )
+
+        self.focus_button = (
+            ctk.CTkButton(
                 focus_card,
-                text=(
-                    "Pomodoro and Focus Mode "
-                    "can be used from the sidebar."
-                )
+                text="Start Quick Focus",
+                width=170,
+                height=42,
+                command=self.open_quick_focus
             )
         )
 
-        self.focus_task_label.pack(
-            pady=5
+        self.focus_button.pack(
+            pady=(10, 20)
         )
 
     # =================================================
@@ -342,6 +391,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
             expand=True
         )
 
+        # Quick Note
         notes_card = ctk.CTkFrame(
             self,
             corner_radius=15
@@ -530,17 +580,20 @@ class DashboardPage(ctk.CTkScrollableFrame):
     def refresh_dashboard(self):
 
         self.load_task_statistics()
-        self.load_pomodoro_statistics()
+        self.load_focus_statistics()
         self.load_dashboard_tasks()
         self.load_today_plan()
+        self.load_quick_focus_tasks()
 
     # =================================================
-    # STATS
+    # STATISTICS
     # =================================================
 
     def load_task_statistics(self):
 
-        stats = get_task_statistics()
+        stats = (
+            get_task_statistics()
+        )
 
         self.tasks_value.configure(
             text=(
@@ -549,26 +602,43 @@ class DashboardPage(ctk.CTkScrollableFrame):
             )
         )
 
-    def load_pomodoro_statistics(self):
+    def load_focus_statistics(self):
 
-        stats = (
+        pomodoro = (
             get_today_pomodoro_stats()
+        )
+
+        focus = (
+            get_today_focus_stats()
         )
 
         self.pomodoro_value.configure(
             text=str(
-                stats["sessions"]
+                pomodoro["sessions"]
             )
         )
 
+        total_seconds = (
+            (
+                pomodoro[
+                    "focus_minutes"
+                ]
+                * 60
+            )
+            +
+            focus[
+                "focus_seconds"
+            ]
+        )
+
         self.focus_value.configure(
-            text=self.format_minutes(
-                stats["focus_minutes"]
+            text=self.format_seconds(
+                total_seconds
             )
         )
 
     # =================================================
-    # TASKS
+    # TASK LIST
     # =================================================
 
     def load_dashboard_tasks(self):
@@ -659,6 +729,127 @@ class DashboardPage(ctk.CTkScrollableFrame):
         self.refresh_dashboard()
 
     # =================================================
+    # QUICK FOCUS LIST
+    # =================================================
+
+    def load_quick_focus_tasks(self):
+
+        tasks = get_today_tasks(
+            limit=100
+        )
+
+        current = (
+            self.quick_focus_menu.get()
+        )
+
+        self.quick_focus_lookup = {
+            "General": {
+                "id": None,
+                "title": "General"
+            }
+        }
+
+        values = [
+            "General"
+        ]
+
+        for task in tasks:
+
+            (
+                task_id,
+                title,
+                due_date,
+                priority,
+                category,
+                completed
+            ) = task
+
+            display = (
+                f"{title} • {priority}"
+            )
+
+            values.append(
+                display
+            )
+
+            self.quick_focus_lookup[
+                display
+            ] = {
+                "id": task_id,
+                "title": title
+            }
+
+        self.quick_focus_menu.configure(
+            values=values
+        )
+
+        if current in values:
+
+            self.quick_focus_menu.set(
+                current
+            )
+
+        else:
+
+            self.quick_focus_menu.set(
+                "General"
+            )
+
+    # =================================================
+    # START QUICK FOCUS
+    # =================================================
+
+    def open_quick_focus(self):
+
+        selected = (
+            self.quick_focus_menu.get()
+        )
+
+        app = self.winfo_toplevel()
+
+        if not hasattr(
+            app,
+            "show_focus"
+        ):
+
+            return
+
+        app.show_focus()
+
+        focus_page = (
+            app.pages.get(
+                "Focus"
+            )
+        )
+
+        if focus_page is None:
+
+            return
+
+        focus_page.load_tasks()
+
+        if (
+            selected
+            in focus_page.task_lookup
+        ):
+
+            focus_page.task_menu.set(
+                selected
+            )
+
+        if not focus_page.is_session_active():
+
+            focus_page.duration_menu.set(
+                "25 minutes"
+            )
+
+            focus_page.change_duration(
+                "25 minutes"
+            )
+
+            focus_page.start_focus()
+
+    # =================================================
     # QUICK NOTE
     # =================================================
 
@@ -681,9 +872,12 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
             return
 
-        title = datetime.now().strftime(
-            "Quick Note - "
-            "%d %b %Y %I:%M %p"
+        title = (
+            datetime.now()
+            .strftime(
+                "Quick Note - "
+                "%d %b %Y %I:%M %p"
+            )
         )
 
         add_note(
@@ -702,7 +896,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
         )
 
     # =================================================
-    # TODAY PLAN
+    # TODAY'S PLAN
     # =================================================
 
     def load_today_plan(self):
@@ -711,6 +905,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
             self.planner_container
             .winfo_children()
         ):
+
             widget.destroy()
 
         activities = (
@@ -771,7 +966,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
                 side="left"
             )
 
-            activity_text = (
+            text = (
                 f"✓ {title}"
                 if completed
                 else title
@@ -779,7 +974,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
             ctk.CTkLabel(
                 row,
-                text=activity_text,
+                text=text,
                 font=ctk.CTkFont(
                     size=14
                 )
@@ -815,22 +1010,42 @@ class DashboardPage(ctk.CTkScrollableFrame):
             ValueError,
             TypeError
         ):
+
             return value
 
-    def format_minutes(
+    def format_seconds(
         self,
-        minutes
+        seconds
     ):
 
-        if minutes < 60:
-            return f"{minutes}m"
+        seconds = int(
+            seconds
+        )
 
-        hours = minutes // 60
-        remaining = minutes % 60
+        hours = (
+            seconds // 3600
+        )
 
-        if remaining == 0:
-            return f"{hours}h"
+        minutes = (
+            (
+                seconds % 3600
+            )
+            // 60
+        )
+
+        if hours:
+
+            if minutes:
+
+                return (
+                    f"{hours}h "
+                    f"{minutes}m"
+                )
+
+            return (
+                f"{hours}h"
+            )
 
         return (
-            f"{hours}h {remaining}m"
+            f"{minutes}m"
         )

@@ -15,15 +15,8 @@ BASE_DIR = (
     .parent
 )
 
-DATA_DIR = (
-    BASE_DIR
-    / "data"
-)
-
-DB_PATH = (
-    DATA_DIR
-    / "lifeos.db"
-)
+DATA_DIR = BASE_DIR / "data"
+DB_PATH = DATA_DIR / "lifeos.db"
 
 DATA_DIR.mkdir(
     parents=True,
@@ -116,6 +109,21 @@ def initialize_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_type TEXT NOT NULL,
             duration_minutes INTEGER NOT NULL,
+            completed_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    # -------------------------------------------------
+    # STOPWATCH
+    # -------------------------------------------------
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS stopwatch_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            duration_seconds INTEGER NOT NULL,
+            lap_count INTEGER DEFAULT 0,
             completed_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -318,14 +326,12 @@ def get_task_statistics():
 
     completed = cursor.fetchone()[0]
 
-    pending = total - completed
-
     connection.close()
 
     return {
         "total": total,
         "completed": completed,
-        "pending": pending
+        "pending": total - completed
     }
 
 
@@ -448,14 +454,14 @@ def get_notes(
             )
         """
 
-        search_pattern = (
+        pattern = (
             f"%{search_text}%"
         )
 
         parameters.extend(
             [
-                search_pattern,
-                search_pattern
+                pattern,
+                pattern
             ]
         )
 
@@ -793,6 +799,7 @@ def get_today_pomodoro_stats():
         """
         SELECT
             COUNT(*),
+
             COALESCE(
                 SUM(duration_minutes),
                 0
@@ -834,8 +841,105 @@ def get_recent_pomodoro_sessions(
 
         FROM pomodoro_sessions
 
-        ORDER BY
-            id DESC
+        ORDER BY id DESC
+
+        LIMIT ?
+        """,
+        (limit,)
+    )
+
+    sessions = cursor.fetchall()
+
+    connection.close()
+
+    return sessions
+
+
+# =================================================
+# STOPWATCH FUNCTIONS
+# =================================================
+
+def add_stopwatch_session(
+    duration_seconds,
+    lap_count=0
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO stopwatch_sessions (
+            duration_seconds,
+            lap_count
+        )
+        VALUES (?, ?)
+        """,
+        (
+            duration_seconds,
+            lap_count
+        )
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def get_today_stopwatch_stats():
+
+    today = (
+        date.today()
+        .isoformat()
+    )
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            COUNT(*),
+
+            COALESCE(
+                SUM(duration_seconds),
+                0
+            )
+
+        FROM stopwatch_sessions
+
+        WHERE DATE(completed_at) = ?
+        """,
+        (today,)
+    )
+
+    result = cursor.fetchone()
+
+    connection.close()
+
+    return {
+        "sessions": result[0],
+        "total_seconds": result[1]
+    }
+
+
+def get_recent_stopwatch_sessions(
+    limit=10
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            duration_seconds,
+            lap_count,
+            completed_at
+
+        FROM stopwatch_sessions
+
+        ORDER BY id DESC
 
         LIMIT ?
         """,

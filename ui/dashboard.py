@@ -6,7 +6,8 @@ from database.database import (
     get_task_statistics,
     get_today_tasks,
     toggle_task,
-    add_note
+    add_note,
+    get_today_planner
 )
 
 
@@ -28,7 +29,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
         self.create_stat_cards()
         self.create_main_section()
         self.create_secondary_section()
-        self.create_planner_section()
+        self.create_today_section()
 
         self.refresh_dashboard()
 
@@ -38,7 +39,9 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
     def create_header(self):
 
-        current_hour = datetime.now().hour
+        current_hour = (
+            datetime.now().hour
+        )
 
         if current_hour < 12:
             greeting = "Good Morning"
@@ -49,16 +52,14 @@ class DashboardPage(ctk.CTkScrollableFrame):
         else:
             greeting = "Good Evening"
 
-        title = ctk.CTkLabel(
+        ctk.CTkLabel(
             self,
             text=f"{greeting} 👋",
             font=ctk.CTkFont(
                 size=30,
                 weight="bold"
             )
-        )
-
-        title.grid(
+        ).grid(
             row=0,
             column=0,
             columnspan=4,
@@ -67,15 +68,13 @@ class DashboardPage(ctk.CTkScrollableFrame):
             sticky="w"
         )
 
-        subtitle = ctk.CTkLabel(
+        ctk.CTkLabel(
             self,
             text="Here's your day at a glance.",
             font=ctk.CTkFont(
                 size=15
             )
-        )
-
-        subtitle.grid(
+        ).grid(
             row=1,
             column=0,
             columnspan=4,
@@ -90,32 +89,40 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
     def create_stat_cards(self):
 
-        self.tasks_value = self.create_stat_card(
-            0,
-            "Tasks",
-            "0 / 0",
-            "Pending / Total"
+        self.tasks_value = (
+            self.create_stat_card(
+                0,
+                "Tasks",
+                "0 / 0",
+                "Pending / Total"
+            )
         )
 
-        self.focus_value = self.create_stat_card(
-            1,
-            "Focus Time",
-            "0m",
-            "Today"
+        self.focus_value = (
+            self.create_stat_card(
+                1,
+                "Focus Time",
+                "0m",
+                "Today"
+            )
         )
 
-        self.pomodoro_value = self.create_stat_card(
-            2,
-            "Pomodoros",
-            "0",
-            "Sessions"
+        self.pomodoro_value = (
+            self.create_stat_card(
+                2,
+                "Pomodoros",
+                "0",
+                "Sessions"
+            )
         )
 
-        self.productivity_value = self.create_stat_card(
-            3,
-            "Productivity",
-            "0%",
-            "Today's Score"
+        self.productivity_value = (
+            self.create_stat_card(
+                3,
+                "Productivity",
+                "0%",
+                "Today's Score"
+            )
         )
 
     def create_stat_card(
@@ -191,9 +198,9 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
     def create_main_section(self):
 
-        # ---------------------------------------------
+        # -------------------------------------------------
         # TODAY'S TASKS
-        # ---------------------------------------------
+        # -------------------------------------------------
 
         tasks_card = ctk.CTkFrame(
             self,
@@ -222,25 +229,11 @@ class DashboardPage(ctk.CTkScrollableFrame):
             pady=(20, 10)
         )
 
-        today_text = datetime.now().strftime(
-            "%d %b %Y"
-        )
-
-        ctk.CTkLabel(
-            tasks_card,
-            text=today_text,
-            font=ctk.CTkFont(
-                size=12
+        self.dashboard_tasks_container = (
+            ctk.CTkFrame(
+                tasks_card,
+                fg_color="transparent"
             )
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(0, 8)
-        )
-
-        self.dashboard_tasks_container = ctk.CTkFrame(
-            tasks_card,
-            fg_color="transparent"
         )
 
         self.dashboard_tasks_container.pack(
@@ -250,9 +243,9 @@ class DashboardPage(ctk.CTkScrollableFrame):
             pady=(0, 15)
         )
 
-        # ---------------------------------------------
+        # -------------------------------------------------
         # QUICK FOCUS
-        # ---------------------------------------------
+        # -------------------------------------------------
 
         focus_card = ctk.CTkFrame(
             self,
@@ -279,12 +272,14 @@ class DashboardPage(ctk.CTkScrollableFrame):
             pady=(25, 10)
         )
 
-        self.focus_timer_label = ctk.CTkLabel(
-            focus_card,
-            text="25:00",
-            font=ctk.CTkFont(
-                size=46,
-                weight="bold"
+        self.focus_timer_label = (
+            ctk.CTkLabel(
+                focus_card,
+                text="25:00",
+                font=ctk.CTkFont(
+                    size=46,
+                    weight="bold"
+                )
             )
         )
 
@@ -292,9 +287,14 @@ class DashboardPage(ctk.CTkScrollableFrame):
             pady=15
         )
 
-        self.focus_task_label = ctk.CTkLabel(
-            focus_card,
-            text="Select a task before starting focus."
+        self.focus_task_label = (
+            ctk.CTkLabel(
+                focus_card,
+                text=(
+                    "Select a task before "
+                    "starting focus."
+                )
+            )
         )
 
         self.focus_task_label.pack(
@@ -313,10 +313,14 @@ class DashboardPage(ctk.CTkScrollableFrame):
         )
 
     # =================================================
-    # SECONDARY SECTION
+    # SECONDARY
     # =================================================
 
     def create_secondary_section(self):
+
+        # -------------------------------------------------
+        # ANALYTICS
+        # -------------------------------------------------
 
         analytics_card = ctk.CTkFrame(
             self,
@@ -352,17 +356,17 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
         ctk.CTkLabel(
             analytics_card,
-            text="Productivity chart will appear here.",
-            font=ctk.CTkFont(
-                size=15
+            text=(
+                "Productivity chart "
+                "will appear here."
             )
         ).pack(
             expand=True
         )
 
-        # ---------------------------------------------
-        # QUICK NOTES
-        # ---------------------------------------------
+        # -------------------------------------------------
+        # QUICK NOTE
+        # -------------------------------------------------
 
         notes_card = ctk.CTkFrame(
             self,
@@ -403,9 +407,11 @@ class DashboardPage(ctk.CTkScrollableFrame):
             pady=10
         )
 
-        self.quick_note_message = ctk.CTkLabel(
-            notes_card,
-            text=""
+        self.quick_note_message = (
+            ctk.CTkLabel(
+                notes_card,
+                text=""
+            )
         )
 
         self.quick_note_message.pack(
@@ -425,17 +431,17 @@ class DashboardPage(ctk.CTkScrollableFrame):
         )
 
     # =================================================
-    # PLANNER
+    # TODAY + PLAN
     # =================================================
 
-    def create_planner_section(self):
+    def create_today_section(self):
 
-        planner_card = ctk.CTkFrame(
+        card = ctk.CTkFrame(
             self,
             corner_radius=15
         )
 
-        planner_card.grid(
+        card.grid(
             row=5,
             column=0,
             columnspan=4,
@@ -444,8 +450,90 @@ class DashboardPage(ctk.CTkScrollableFrame):
             sticky="nsew"
         )
 
+        card.grid_columnconfigure(
+            0,
+            weight=1
+        )
+
+        card.grid_columnconfigure(
+            1,
+            weight=3
+        )
+
+        # -------------------------------------------------
+        # DATE
+        # -------------------------------------------------
+
+        date_frame = ctk.CTkFrame(
+            card,
+            fg_color="transparent"
+        )
+
+        date_frame.grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            padx=20,
+            pady=20
+        )
+
+        now = datetime.now()
+
         ctk.CTkLabel(
-            planner_card,
+            date_frame,
+            text="TODAY",
+            font=ctk.CTkFont(
+                size=12,
+                weight="bold"
+            )
+        ).pack(
+            anchor="w"
+        )
+
+        ctk.CTkLabel(
+            date_frame,
+            text=now.strftime("%A"),
+            font=ctk.CTkFont(
+                size=25,
+                weight="bold"
+            )
+        ).pack(
+            anchor="w",
+            pady=(8, 0)
+        )
+
+        ctk.CTkLabel(
+            date_frame,
+            text=now.strftime(
+                "%d %B %Y"
+            ),
+            font=ctk.CTkFont(
+                size=15
+            )
+        ).pack(
+            anchor="w",
+            pady=(2, 0)
+        )
+
+        # -------------------------------------------------
+        # PLAN
+        # -------------------------------------------------
+
+        plan_frame = ctk.CTkFrame(
+            card,
+            fg_color="transparent"
+        )
+
+        plan_frame.grid(
+            row=0,
+            column=1,
+            sticky="nsew",
+            padx=20,
+            pady=20
+        )
+
+        ctk.CTkLabel(
+            plan_frame,
             text="Today's Plan",
             font=ctk.CTkFont(
                 size=20,
@@ -453,23 +541,19 @@ class DashboardPage(ctk.CTkScrollableFrame):
             )
         ).pack(
             anchor="w",
-            padx=20,
-            pady=(20, 10)
+            pady=(0, 10)
         )
 
-        ctk.CTkLabel(
-            planner_card,
-            text=(
-                "Planner activities will appear here "
-                "once the Planner module is built."
-            ),
-            font=ctk.CTkFont(
-                size=14
+        self.planner_container = (
+            ctk.CTkFrame(
+                plan_frame,
+                fg_color="transparent"
             )
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(5, 20)
+        )
+
+        self.planner_container.pack(
+            fill="both",
+            expand=True
         )
 
     # =================================================
@@ -480,6 +564,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
         self.load_task_statistics()
         self.load_dashboard_tasks()
+        self.load_today_plan()
 
     # =================================================
     # TASK STATISTICS
@@ -534,20 +619,21 @@ class DashboardPage(ctk.CTkScrollableFrame):
                 completed
             ) = task
 
-            task_frame = ctk.CTkFrame(
+            row = ctk.CTkFrame(
                 self.dashboard_tasks_container,
                 fg_color="transparent"
             )
 
-            task_frame.pack(
+            row.pack(
                 fill="x",
                 pady=5
             )
 
             checkbox = ctk.CTkCheckBox(
-                task_frame,
+                row,
                 text=title,
-                command=lambda task_id=task_id: (
+                command=(
+                    lambda task_id=task_id:
                     self.complete_dashboard_task(
                         task_id
                     )
@@ -559,13 +645,12 @@ class DashboardPage(ctk.CTkScrollableFrame):
                 padx=5
             )
 
-            details = (
-                f"{category} • {priority}"
-            )
-
             ctk.CTkLabel(
-                task_frame,
-                text=details,
+                row,
+                text=(
+                    f"{category} • "
+                    f"{priority}"
+                ),
                 font=ctk.CTkFont(
                     size=11
                 )
@@ -575,7 +660,7 @@ class DashboardPage(ctk.CTkScrollableFrame):
             )
 
     # =================================================
-    # COMPLETE DASHBOARD TASK
+    # COMPLETE TASK
     # =================================================
 
     def complete_dashboard_task(
@@ -598,7 +683,10 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
         content = (
             self.note_box
-            .get("1.0", "end")
+            .get(
+                "1.0",
+                "end"
+            )
             .strip()
         )
 
@@ -610,10 +698,9 @@ class DashboardPage(ctk.CTkScrollableFrame):
 
             return
 
-        current_time = datetime.now()
-
-        title = current_time.strftime(
-            "Quick Note - %d %b %Y %I:%M %p"
+        title = datetime.now().strftime(
+            "Quick Note - "
+            "%d %b %Y %I:%M %p"
         )
 
         add_note(
@@ -630,3 +717,118 @@ class DashboardPage(ctk.CTkScrollableFrame):
         self.quick_note_message.configure(
             text="Note saved."
         )
+
+    # =================================================
+    # TODAY'S PLAN
+    # =================================================
+
+    def load_today_plan(self):
+
+        for widget in (
+            self.planner_container
+            .winfo_children()
+        ):
+            widget.destroy()
+
+        activities = get_today_planner(
+            limit=10
+        )
+
+        if not activities:
+
+            ctk.CTkLabel(
+                self.planner_container,
+                text="Nothing planned for today."
+            ).pack(
+                anchor="w",
+                pady=10
+            )
+
+            return
+
+        for activity in activities:
+
+            (
+                activity_id,
+                title,
+                activity_date,
+                start_time,
+                end_time,
+                category,
+                completed
+            ) = activity
+
+            row = ctk.CTkFrame(
+                self.planner_container,
+                fg_color="transparent"
+            )
+
+            row.pack(
+                fill="x",
+                pady=5
+            )
+
+            # Time
+            ctk.CTkLabel(
+                row,
+                text=self.format_time(
+                    start_time
+                ),
+                width=90,
+                anchor="w",
+                font=ctk.CTkFont(
+                    size=13,
+                    weight="bold"
+                )
+            ).pack(
+                side="left"
+            )
+
+            # Activity
+            activity_text = title
+
+            if completed:
+                activity_text = (
+                    f"✓ {title}"
+                )
+
+            ctk.CTkLabel(
+                row,
+                text=activity_text,
+                font=ctk.CTkFont(
+                    size=14
+                )
+            ).pack(
+                side="left",
+                padx=10
+            )
+
+    # =================================================
+    # TIME FORMAT
+    # =================================================
+
+    def format_time(
+        self,
+        value
+    ):
+
+        try:
+
+            parsed = datetime.strptime(
+                value,
+                "%H:%M"
+            )
+
+            return (
+                parsed.strftime(
+                    "%I:%M %p"
+                )
+                .lstrip("0")
+            )
+
+        except (
+            ValueError,
+            TypeError
+        ):
+
+            return value

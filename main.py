@@ -1,36 +1,63 @@
 import customtkinter as ctk
+
 from datetime import datetime
 
 from ui.dashboard import DashboardPage
 from ui.tasks import TasksPage
+from ui.notes import NotesPage
+from ui.planner import PlannerPage
 from ui.components import NavButton
 
-from database.database import initialize_database
+from database.database import (
+    initialize_database
+)
 
-from ui.notes import NotesPage
 
-ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("blue")
+ctk.set_appearance_mode(
+    "dark"
+)
+
+ctk.set_default_color_theme(
+    "blue"
+)
 
 
 class LifeOSApp(ctk.CTk):
 
     def __init__(self):
+
         super().__init__()
 
-        # Initialize database before loading UI
+        # Initialize SQLite tables
         initialize_database()
 
-        self.title("LifeOS")
-        self.geometry("1400x820")
-        self.minsize(1050, 650)
+        self.title(
+            "LifeOS"
+        )
+
+        self.geometry(
+            "1400x820"
+        )
+
+        self.minsize(
+            1050,
+            650
+        )
 
         self.sidebar_open = True
+
         self.sidebar_width = 220
         self.sidebar_collapsed_width = 72
 
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(
+            1,
+            weight=1
+        )
+
+        self.grid_columnconfigure(
+            1,
+            weight=1
+        )
 
         self.create_topbar()
         self.create_sidebar()
@@ -38,9 +65,9 @@ class LifeOSApp(ctk.CTk):
 
         self.show_dashboard()
 
-    # -------------------------------------------------
+    # =================================================
     # TOP BAR
-    # -------------------------------------------------
+    # =================================================
 
     def create_topbar(self):
 
@@ -57,16 +84,21 @@ class LifeOSApp(ctk.CTk):
             sticky="ew"
         )
 
-        self.topbar.grid_columnconfigure(2, weight=1)
+        self.topbar.grid_columnconfigure(
+            2,
+            weight=1
+        )
 
-        # Menu Button
-        self.menu_button = ctk.CTkButton(
-            self.topbar,
-            text="☰",
-            width=42,
-            height=38,
-            corner_radius=10,
-            command=self.toggle_sidebar
+        # Menu
+        self.menu_button = (
+            ctk.CTkButton(
+                self.topbar,
+                text="☰",
+                width=42,
+                height=38,
+                corner_radius=10,
+                command=self.toggle_sidebar
+            )
         )
 
         self.menu_button.grid(
@@ -76,13 +108,15 @@ class LifeOSApp(ctk.CTk):
             pady=10
         )
 
-        # App Name
-        self.app_title = ctk.CTkLabel(
-            self.topbar,
-            text="LifeOS",
-            font=ctk.CTkFont(
-                size=24,
-                weight="bold"
+        # App title
+        self.app_title = (
+            ctk.CTkLabel(
+                self.topbar,
+                text="LifeOS",
+                font=ctk.CTkFont(
+                    size=24,
+                    weight="bold"
+                )
             )
         )
 
@@ -93,14 +127,21 @@ class LifeOSApp(ctk.CTk):
         )
 
         # Date
-        date_text = datetime.now().strftime(
-            "%A, %d %B"
+        date_text = (
+            datetime.now()
+            .strftime(
+                "%A, %d %B"
+            )
         )
 
-        self.date_label = ctk.CTkLabel(
-            self.topbar,
-            text=date_text,
-            font=ctk.CTkFont(size=14)
+        self.date_label = (
+            ctk.CTkLabel(
+                self.topbar,
+                text=date_text,
+                font=ctk.CTkFont(
+                    size=14
+                )
+            )
         )
 
         self.date_label.grid(
@@ -109,11 +150,13 @@ class LifeOSApp(ctk.CTk):
             padx=15
         )
 
-        # Theme Toggle
-        self.theme_switch = ctk.CTkSwitch(
-            self.topbar,
-            text="Dark",
-            command=self.toggle_theme
+        # Theme
+        self.theme_switch = (
+            ctk.CTkSwitch(
+                self.topbar,
+                text="Dark",
+                command=self.toggle_theme
+            )
         )
 
         self.theme_switch.select()
@@ -124,16 +167,18 @@ class LifeOSApp(ctk.CTk):
             padx=(5, 20)
         )
 
-    # -------------------------------------------------
+    # =================================================
     # SIDEBAR
-    # -------------------------------------------------
+    # =================================================
 
     def create_sidebar(self):
 
-        self.sidebar = ctk.CTkFrame(
-            self,
-            width=self.sidebar_width,
-            corner_radius=0
+        self.sidebar = (
+            ctk.CTkFrame(
+                self,
+                width=self.sidebar_width,
+                corner_radius=0
+            )
         )
 
         self.sidebar.grid(
@@ -142,12 +187,19 @@ class LifeOSApp(ctk.CTk):
             sticky="nsew"
         )
 
-        self.sidebar.grid_propagate(False)
-        self.sidebar.grid_columnconfigure(0, weight=1)
+        self.sidebar.grid_propagate(
+            False
+        )
+
+        self.sidebar.grid_columnconfigure(
+            0,
+            weight=1
+        )
 
         self.nav_buttons = []
 
         navigation = [
+
             (
                 "Dashboard",
                 "⌂",
@@ -163,25 +215,31 @@ class LifeOSApp(ctk.CTk):
             (
                 "Planner",
                 "▦",
-                lambda: self.show_placeholder("Planner")
+                self.show_planner
             ),
 
             (
                 "Focus",
                 "◎",
-                lambda: self.show_placeholder("Focus Mode")
+                lambda: self.show_placeholder(
+                    "Focus Mode"
+                )
             ),
 
             (
                 "Pomodoro",
                 "◷",
-                lambda: self.show_placeholder("Pomodoro")
+                lambda: self.show_placeholder(
+                    "Pomodoro"
+                )
             ),
 
             (
                 "Stopwatch",
                 "◴",
-                lambda: self.show_placeholder("Stopwatch")
+                lambda: self.show_placeholder(
+                    "Stopwatch"
+                )
             ),
 
             (
@@ -193,25 +251,35 @@ class LifeOSApp(ctk.CTk):
             (
                 "Analytics",
                 "▥",
-                lambda: self.show_placeholder("Analytics")
+                lambda: self.show_placeholder(
+                    "Analytics"
+                )
             ),
 
             (
                 "History",
                 "↺",
-                lambda: self.show_placeholder("History")
+                lambda: self.show_placeholder(
+                    "History"
+                )
             ),
 
             (
                 "Reports",
                 "▧",
-                lambda: self.show_placeholder("Reports")
+                lambda: self.show_placeholder(
+                    "Reports"
+                )
             ),
         ]
 
         row = 0
 
-        for text, icon, command in navigation:
+        for (
+            text,
+            icon,
+            command
+        ) in navigation:
 
             button = NavButton(
                 self.sidebar,
@@ -228,22 +296,26 @@ class LifeOSApp(ctk.CTk):
                 sticky="ew"
             )
 
-            self.nav_buttons.append(button)
+            self.nav_buttons.append(
+                button
+            )
 
             row += 1
 
-        # Push Settings to bottom
         self.sidebar.grid_rowconfigure(
             row,
             weight=1
         )
 
-        self.settings_button = NavButton(
-            self.sidebar,
-            text="Settings",
-            icon="⚙",
-            command=lambda: self.show_placeholder(
-                "Settings"
+        self.settings_button = (
+            NavButton(
+                self.sidebar,
+                text="Settings",
+                icon="⚙",
+                command=lambda:
+                self.show_placeholder(
+                    "Settings"
+                )
             )
         )
 
@@ -259,16 +331,18 @@ class LifeOSApp(ctk.CTk):
             self.settings_button
         )
 
-    # -------------------------------------------------
-    # CONTENT AREA
-    # -------------------------------------------------
+    # =================================================
+    # CONTENT
+    # =================================================
 
     def create_content_area(self):
 
-        self.content = ctk.CTkFrame(
-            self,
-            corner_radius=0,
-            fg_color="transparent"
+        self.content = (
+            ctk.CTkFrame(
+                self,
+                corner_radius=0,
+                fg_color="transparent"
+            )
         )
 
         self.content.grid(
@@ -287,14 +361,22 @@ class LifeOSApp(ctk.CTk):
             weight=1
         )
 
-    # -------------------------------------------------
-    # PAGE MANAGEMENT
-    # -------------------------------------------------
+    # =================================================
+    # CLEAR CONTENT
+    # =================================================
 
     def clear_content(self):
 
-        for widget in self.content.winfo_children():
+        for widget in (
+            self.content
+            .winfo_children()
+        ):
+
             widget.destroy()
+
+    # =================================================
+    # DASHBOARD
+    # =================================================
 
     def show_dashboard(self):
 
@@ -310,6 +392,10 @@ class LifeOSApp(ctk.CTk):
             sticky="nsew"
         )
 
+    # =================================================
+    # TASKS
+    # =================================================
+
     def show_tasks(self):
 
         self.clear_content()
@@ -323,8 +409,13 @@ class LifeOSApp(ctk.CTk):
             column=0,
             sticky="nsew"
         )
-        
+
+    # =================================================
+    # NOTES
+    # =================================================
+
     def show_notes(self):
+
         self.clear_content()
 
         page = NotesPage(
@@ -337,7 +428,32 @@ class LifeOSApp(ctk.CTk):
             sticky="nsew"
         )
 
-    def show_placeholder(self, title):
+    # =================================================
+    # PLANNER
+    # =================================================
+
+    def show_planner(self):
+
+        self.clear_content()
+
+        page = PlannerPage(
+            self.content
+        )
+
+        page.grid(
+            row=0,
+            column=0,
+            sticky="nsew"
+        )
+
+    # =================================================
+    # PLACEHOLDER
+    # =================================================
+
+    def show_placeholder(
+        self,
+        title
+    ):
 
         self.clear_content()
 
@@ -370,8 +486,13 @@ class LifeOSApp(ctk.CTk):
 
         subtitle = ctk.CTkLabel(
             page,
-            text=f"{title} module coming next.",
-            font=ctk.CTkFont(size=15)
+            text=(
+                f"{title} module "
+                f"coming next."
+            ),
+            font=ctk.CTkFont(
+                size=15
+            )
         )
 
         subtitle.pack(
@@ -379,19 +500,25 @@ class LifeOSApp(ctk.CTk):
             padx=35
         )
 
-    # -------------------------------------------------
-    # COLLAPSIBLE SIDEBAR
-    # -------------------------------------------------
+    # =================================================
+    # SIDEBAR TOGGLE
+    # =================================================
 
     def toggle_sidebar(self):
 
         if self.sidebar_open:
 
             self.sidebar.configure(
-                width=self.sidebar_collapsed_width
+                width=(
+                    self
+                    .sidebar_collapsed_width
+                )
             )
 
-            for button in self.nav_buttons:
+            for button in (
+                self.nav_buttons
+            ):
+
                 button.collapse()
 
             self.sidebar_open = False
@@ -399,23 +526,31 @@ class LifeOSApp(ctk.CTk):
         else:
 
             self.sidebar.configure(
-                width=self.sidebar_width
+                width=(
+                    self
+                    .sidebar_width
+                )
             )
 
-            for button in self.nav_buttons:
+            for button in (
+                self.nav_buttons
+            ):
+
                 button.expand()
 
             self.sidebar_open = True
 
-    # -------------------------------------------------
+    # =================================================
     # THEME
-    # -------------------------------------------------
+    # =================================================
 
     def toggle_theme(self):
 
         if self.theme_switch.get():
 
-            ctk.set_appearance_mode("dark")
+            ctk.set_appearance_mode(
+                "dark"
+            )
 
             self.theme_switch.configure(
                 text="Dark"
@@ -423,7 +558,9 @@ class LifeOSApp(ctk.CTk):
 
         else:
 
-            ctk.set_appearance_mode("light")
+            ctk.set_appearance_mode(
+                "light"
+            )
 
             self.theme_switch.configure(
                 text="Light"
@@ -433,4 +570,5 @@ class LifeOSApp(ctk.CTk):
 if __name__ == "__main__":
 
     app = LifeOSApp()
+
     app.mainloop()

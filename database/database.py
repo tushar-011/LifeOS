@@ -59,6 +59,20 @@ def initialize_database():
         """
     )
     
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS planner (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            activity_date TEXT NOT NULL,
+            start_time TEXT,
+            end_time TEXT,
+            category TEXT DEFAULT 'General',
+            completed INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
     connection.commit()
     connection.close()
 
@@ -502,3 +516,234 @@ def get_note_count():
 
     return count
 
+# =================================================
+# PLANNER
+# =================================================
+
+
+def add_planner_activity(
+    title,
+    activity_date,
+    start_time="",
+    end_time="",
+    category="General"
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO planner (
+            title,
+            activity_date,
+            start_time,
+            end_time,
+            category
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            title,
+            activity_date,
+            start_time,
+            end_time,
+            category
+        )
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def get_planner_activities(activity_date=None):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    if activity_date:
+
+        cursor.execute(
+            """
+            SELECT
+                id,
+                title,
+                activity_date,
+                start_time,
+                end_time,
+                category,
+                completed
+
+            FROM planner
+
+            WHERE activity_date = ?
+
+            ORDER BY
+                CASE
+                    WHEN start_time IS NULL
+                    OR start_time = ''
+                    THEN 1
+                    ELSE 0
+                END,
+                start_time ASC,
+                id ASC
+            """,
+            (activity_date,)
+        )
+
+    else:
+
+        cursor.execute(
+            """
+            SELECT
+                id,
+                title,
+                activity_date,
+                start_time,
+                end_time,
+                category,
+                completed
+
+            FROM planner
+
+            ORDER BY
+                activity_date ASC,
+                start_time ASC,
+                id ASC
+            """
+        )
+
+    activities = cursor.fetchall()
+
+    connection.close()
+
+    return activities
+
+
+def update_planner_activity(
+    activity_id,
+    title,
+    activity_date,
+    start_time,
+    end_time,
+    category
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        UPDATE planner
+
+        SET
+            title = ?,
+            activity_date = ?,
+            start_time = ?,
+            end_time = ?,
+            category = ?
+
+        WHERE id = ?
+        """,
+        (
+            title,
+            activity_date,
+            start_time,
+            end_time,
+            category,
+            activity_id
+        )
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def toggle_planner_activity(
+    activity_id,
+    completed
+):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        UPDATE planner
+        SET completed = ?
+        WHERE id = ?
+        """,
+        (
+            completed,
+            activity_id
+        )
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def delete_planner_activity(activity_id):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        DELETE FROM planner
+        WHERE id = ?
+        """,
+        (activity_id,)
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def get_today_planner(limit=6):
+
+    today = date.today().isoformat()
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            title,
+            activity_date,
+            start_time,
+            end_time,
+            category,
+            completed
+
+        FROM planner
+
+        WHERE activity_date = ?
+
+        ORDER BY
+            completed ASC,
+
+            CASE
+                WHEN start_time IS NULL
+                OR start_time = ''
+                THEN 1
+                ELSE 0
+            END,
+
+            start_time ASC
+
+        LIMIT ?
+        """,
+        (
+            today,
+            limit
+        )
+    )
+
+    activities = cursor.fetchall()
+
+    connection.close()
+
+    return activities
